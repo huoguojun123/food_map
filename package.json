@@ -1,0 +1,43 @@
+{
+  "name": "gourmetlog",
+  "version": "1.0.0",
+  "description": "Personal food memory and AI-powered recommendation engine",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "server": "bun server/index.ts",
+    "server:dev": "bun --watch server/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/huoguojun123/food_map.git"
+  },
+  "keywords": [
+    "food",
+    "restaurant",
+    "ai",
+    "recommendation",
+    "gourmetlog"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "next": "^14.2.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "typescript": "^5.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.2.0"
+  }
+}
