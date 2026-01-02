@@ -80,6 +80,9 @@ uploads/
 
 # claude
 .claude/
-.spec-workflow/
+.spec-workflow/approvals/
+.spec-workflow/archive/
+.spec-workflow/specs/
+.spec-workflow/user-templates/
 nul
 CLAUDE.md
