@@ -177,13 +177,15 @@ function validateCreateSpotDto(body: unknown): {
   }
 
   if (hasLat) {
-    if (dto.lat < -90 || dto.lat > 90) {
+    const lat = dto.lat as number;
+    if (lat < -90 || lat > 90) {
       details.push({ field: 'lat', message: 'Latitude must be between -90 and 90' });
     }
   }
 
   if (hasLng) {
-    if (dto.lng < -180 || dto.lng > 180) {
+    const lng = dto.lng as number;
+    if (lng < -180 || lng > 180) {
       details.push({ field: 'lng', message: 'Longitude must be between -180 and 180' });
     }
   }

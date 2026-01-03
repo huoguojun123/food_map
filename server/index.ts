@@ -8,7 +8,7 @@ const API_HOST = process.env.API_HOST || '127.0.0.1';
 
 // Load .env.local file for Bun
 // Bun doesn't load .env.local by default
-const envPath = import.meta.env.PROD ? '.env' : '.env.local';
+const envPath = process.env.NODE_ENV === 'production' ? '.env' : '.env.local';
 const fs = require('fs');
 const path = require('path');
 
