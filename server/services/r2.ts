@@ -61,7 +61,7 @@ export async function uploadImage(file: File): Promise<R2UploadResult> {
     const base64 = await fileToBase64(file);
     return {
       key: '',
-      url: base64,
+      url: `data:${file.type};base64,${base64}`,
       isBase64: true,
     };
   }

@@ -175,9 +175,12 @@ async function fetchPageText(url: string): Promise<string> {
 }
 
 function extractPlainText(html: string): string {
-  const withoutScripts = html
-    .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, ' ')
-    .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, ' ');
-  const withoutTags = withoutScripts.replace(/<[^>]+>/g, ' ');
-  return withoutTags.replace(/\\s+/g, ' ').trim().slice(0, 4000);
+  const scriptPattern = new RegExp('<script[^>]*>[\\s\\S]*?<\\/script>', 'gi')
+  const stylePattern = new RegExp('<style[^>]*>[\\s\\S]*?<\\/style>', 'gi')
+  const tagPattern = new RegExp('<[^>]+>', 'g')
+  const spacePattern = new RegExp('\\s+', 'g')
+
+  const withoutScripts = html.replace(scriptPattern, ' ').replace(stylePattern, ' ')
+  const withoutTags = withoutScripts.replace(tagPattern, ' ')
+  return withoutTags.replace(spacePattern, ' ').trim().slice(0, 4000)
 }

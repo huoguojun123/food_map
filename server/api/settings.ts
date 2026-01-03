@@ -8,6 +8,11 @@ type SettingsPayload = {
   amapKey?: string
 }
 
+type SettingsTestResult = {
+  ok: boolean
+  message: string
+}
+
 const ENV_PATH = '.env.local'
 
 const KEY_MAP: Record<keyof SettingsPayload, string> = {
@@ -68,6 +73,37 @@ export async function handleSettings(req: Request): Promise<Response> {
       {
         error: error instanceof Error ? error.message : '操作失败',
         details: String(error),
+      },
+      { status: 500 }
+    )
+  }
+}
+
+export async function handleSettingsTest(req: Request): Promise<Response> {
+  try {
+    const body = (await req.json()) as SettingsPayload
+    const effective = {
+      aiKey: body.aiKey || process.env.OPENAI_API_KEY,
+      aiBaseUrl: body.aiBaseUrl || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+      aiModel: body.aiModel || process.env.OPENAI_MODEL || 'gpt-4o',
+      amapKey: body.amapKey || process.env.AMAP_KEY,
+    }
+
+    const [aiResult, amapResult] = await Promise.all([
+      testAiConnection(effective.aiKey, effective.aiBaseUrl, effective.aiModel),
+      testAmapConnection(effective.amapKey),
+    ])
+
+    return Response.json({
+      success: true,
+      ai: aiResult,
+      amap: amapResult,
+    })
+  } catch (error) {
+    return Response.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : '测试失败',
       },
       { status: 500 }
     )
@@ -145,4 +181,86 @@ function formatEnvValue(value: string): string {
   }
 
   return value
+}
+
+async function testAiConnection(
+  apiKey: string | undefined,
+  baseUrl: string,
+  model: string
+): Promise<SettingsTestResult> {
+  if (!apiKey) {
+    return { ok: false, message: '未提供 AI Key' }
+  }
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 6000)
+
+  try {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: 'ping' }],
+        max_tokens: 5,
+      }),
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      return { ok: false, message: `AI 连接失败：${response.status} ${errorText}` }
+    }
+
+    return { ok: true, message: 'AI 连接正常' }
+  } catch (error) {
+    clearTimeout(timeoutId)
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'AI 连接失败',
+    }
+  }
+}
+
+async function testAmapConnection(amapKey: string | undefined): Promise<SettingsTestResult> {
+  if (!amapKey) {
+    return { ok: false, message: '未提供高德 Key' }
+  }
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 6000)
+
+  try {
+    const params = new URLSearchParams({
+      key: amapKey,
+      address: '北京市',
+    })
+    const response = await fetch(`https://restapi.amap.com/v3/geocode/geo?${params.toString()}`, {
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      return { ok: false, message: `地图连接失败：${response.status}` }
+    }
+
+    const data = (await response.json()) as { status?: string; info?: string }
+    if (data.status !== '1') {
+      return { ok: false, message: `地图连接失败：${data.info || '未知错误'}` }
+    }
+
+    return { ok: true, message: '地图连接正常' }
+  } catch (error) {
+    clearTimeout(timeoutId)
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : '地图连接失败',
+    }
+  }
 }

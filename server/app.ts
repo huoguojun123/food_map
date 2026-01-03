@@ -6,7 +6,7 @@ import { handleCreateSpot, handleListSpots, handleGetSpot } from './api/spots.js
 import { handleAiExtract } from './api/ai.js';
 import { handleGeocode } from './api/geocode.js';
 import { handleUpload } from './api/upload.js';
-import { handleSettings } from './api/settings.js';
+import { handleSettings, handleSettingsTest } from './api/settings.js';
 
 // Route handler type
 type RouteHandler = (req: Request, url: URL) => Response | Promise<Response>;
@@ -55,6 +55,13 @@ registerRoute('/api/upload/r2', async (req, url) => {
 registerRoute('/api/settings', async (req, url) => {
   if (req.method === 'POST') {
     return handleSettings(req);
+  }
+  return Response.json({ error: 'Method not allowed' }, { status: 405 });
+});
+
+registerRoute('/api/settings/test', async (req, url) => {
+  if (req.method === 'POST') {
+    return handleSettingsTest(req);
   }
   return Response.json({ error: 'Method not allowed' }, { status: 405 });
 });

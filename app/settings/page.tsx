@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { Save } from 'lucide-react'
-import { saveSettings } from '@/lib/api/settings'
+import { saveSettings, testSettings } from '@/lib/api/settings'
 
 type SettingsForm = {
   aiKey: string
@@ -11,21 +11,34 @@ type SettingsForm = {
   amapKey: string
 }
 
+type StoredSettings = {
+  aiKey?: string
+  aiBaseUrl?: string
+  aiModel?: string
+  amapKey?: string
+}
+
 const STORAGE_KEY = 'gourmetlog-settings'
 
 const defaultSettings: SettingsForm = {
   aiKey: '',
-  aiBaseUrl: 'https://api.siliconflow.cn/v1',
-  aiModel: 'Qwen/Qwen2.5-VL-235B-A22B-Instruct',
+  aiBaseUrl: '',
+  aiModel: '',
   amapKey: '',
 }
 
 export default function SettingsPage() {
   const [form, setForm] = useState<SettingsForm>(defaultSettings)
+  const [stored, setStored] = useState<StoredSettings>({})
   const [isSaving, setIsSaving] = useState(false)
+  const [isTesting, setIsTesting] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{
     type: 'success' | 'error'
     text: string
+  } | null>(null)
+  const [testResult, setTestResult] = useState<{
+    ai?: { ok: boolean; message: string }
+    amap?: { ok: boolean; message: string }
   } | null>(null)
 
   useEffect(() => {
@@ -35,13 +48,13 @@ export default function SettingsPage() {
     }
 
     try {
-      const parsed = JSON.parse(saved) as Partial<SettingsForm>
-      setForm({
-        aiKey: parsed.aiKey ?? defaultSettings.aiKey,
-        aiBaseUrl: parsed.aiBaseUrl ?? defaultSettings.aiBaseUrl,
-        aiModel: parsed.aiModel ?? defaultSettings.aiModel,
-        amapKey: parsed.amapKey ?? defaultSettings.amapKey,
-      })
+      const parsed = JSON.parse(saved) as StoredSettings
+      setStored(parsed)
+      setForm(prev => ({
+        ...prev,
+        aiBaseUrl: parsed.aiBaseUrl || '',
+        aiModel: parsed.aiModel || '',
+      }))
     } catch (error) {
       console.error('Failed to load settings:', error)
     }
@@ -51,13 +64,63 @@ export default function SettingsPage() {
     setForm(prev => ({ ...prev, [key]: value }))
   }
 
+  const buildPayload = (): StoredSettings => {
+    const payload: StoredSettings = {}
+
+    if (form.aiKey.trim()) {
+      payload.aiKey = form.aiKey.trim()
+    }
+
+    if (form.aiBaseUrl.trim()) {
+      payload.aiBaseUrl = form.aiBaseUrl.trim()
+    }
+
+    if (form.aiModel.trim()) {
+      payload.aiModel = form.aiModel.trim()
+    }
+
+    if (form.amapKey.trim()) {
+      payload.amapKey = form.amapKey.trim()
+    }
+
+    return payload
+  }
+
+  const mergeStored = (payload: StoredSettings): StoredSettings => {
+    return {
+      aiKey: payload.aiKey || stored.aiKey,
+      aiBaseUrl: payload.aiBaseUrl || stored.aiBaseUrl,
+      aiModel: payload.aiModel || stored.aiModel,
+      amapKey: payload.amapKey || stored.amapKey,
+    }
+  }
+
   const handleSave = async () => {
     setIsSaving(true)
     setSaveMessage(null)
 
     try {
-      const result = await saveSettings(form)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(form))
+      const payload = buildPayload()
+      const result = await saveSettings(payload)
+
+      const nextStored = mergeStored(payload)
+      if (!form.aiBaseUrl.trim()) {
+        delete nextStored.aiBaseUrl
+      }
+      if (!form.aiModel.trim()) {
+        delete nextStored.aiModel
+      }
+      if (form.aiKey.trim()) {
+        nextStored.aiKey = form.aiKey.trim()
+      }
+      if (form.amapKey.trim()) {
+        nextStored.amapKey = form.amapKey.trim()
+      }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStored))
+      setStored(nextStored)
+      setForm(prev => ({ ...prev, aiKey: '', amapKey: '' }))
+
       setSaveMessage({
         type: 'success',
         text: result?.message || '配置已保存，后端需重启后生效',
@@ -72,6 +135,24 @@ export default function SettingsPage() {
     }
   }
 
+  const handleTest = async () => {
+    setIsTesting(true)
+    setTestResult(null)
+
+    try {
+      const payload = buildPayload()
+      const effective = mergeStored(payload)
+      const result = await testSettings(effective)
+      setTestResult({ ai: result.ai, amap: result.amap })
+    } catch (error) {
+      setTestResult({
+        ai: { ok: false, message: error instanceof Error ? error.message : '测试失败' },
+      })
+    } finally {
+      setIsTesting(false)
+    }
+  }
+
   const handleReset = () => {
     if (!confirm('确定要重置为默认配置吗？')) {
       return
@@ -79,6 +160,18 @@ export default function SettingsPage() {
 
     setForm(defaultSettings)
     setSaveMessage(null)
+    setTestResult(null)
+  }
+
+  const clearLocalSecret = (key: 'aiKey' | 'amapKey') => {
+    const nextStored = { ...stored }
+    delete nextStored[key]
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStored))
+    setStored(nextStored)
+    setSaveMessage({
+      type: 'success',
+      text: '已清除本地覆盖，将回退到环境变量配置',
+    })
   }
 
   return (
@@ -87,7 +180,7 @@ export default function SettingsPage() {
         <div className="max-w-5xl mx-auto px-6 py-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-display text-zinc-900">设置</h1>
-            <p className="text-sm text-zinc-600">管理 AI 与地图服务配置</p>
+            <p className="text-sm text-zinc-600">本地填写优先，否则使用环境变量</p>
           </div>
           <a
             href="/"
@@ -119,6 +212,21 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {testResult && (
+            <div className="mag-card rounded-[24px] p-4 text-sm space-y-2">
+              {testResult.ai && (
+                <div className={testResult.ai.ok ? 'text-green-700' : 'text-red-700'}>
+                  AI：{testResult.ai.message}
+                </div>
+              )}
+              {testResult.amap && (
+                <div className={testResult.amap.ok ? 'text-green-700' : 'text-red-700'}>
+                  地图：{testResult.amap.message}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="mag-card rounded-[32px] p-6 shadow-sm">
             <h2 className="text-xl font-display text-zinc-900 mb-6">AI 配置</h2>
 
@@ -131,9 +239,18 @@ export default function SettingsPage() {
                   type="password"
                   value={form.aiKey}
                   onChange={e => handleChange('aiKey', e.target.value)}
-                  placeholder="sk-...（仅保存在本机）"
+                  placeholder={stored.aiKey ? '已保存本地（保持为空即沿用）' : 'sk-...（留空则使用环境变量）'}
                   className="w-full px-4 py-3 rounded-2xl border border-orange-100 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
                 />
+                {stored.aiKey && (
+                  <button
+                    type="button"
+                    onClick={() => clearLocalSecret('aiKey')}
+                    className="mt-2 text-xs text-orange-600 hover:text-orange-700"
+                  >
+                    清除本地覆盖
+                  </button>
+                )}
               </div>
 
               <div>
@@ -144,7 +261,7 @@ export default function SettingsPage() {
                   type="url"
                   value={form.aiBaseUrl}
                   onChange={e => handleChange('aiBaseUrl', e.target.value)}
-                  placeholder="https://api.siliconflow.cn/v1"
+                  placeholder={stored.aiBaseUrl || '留空则使用环境变量'}
                   className="w-full px-4 py-3 rounded-2xl border border-orange-100 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
                 />
               </div>
@@ -153,19 +270,13 @@ export default function SettingsPage() {
                 <label className="block text-sm font-medium text-zinc-700 mb-2">
                   模型
                 </label>
-                <select
+                <input
+                  type="text"
                   value={form.aiModel}
                   onChange={e => handleChange('aiModel', e.target.value)}
+                  placeholder={stored.aiModel || '留空则使用环境变量'}
                   className="w-full px-4 py-3 rounded-2xl border border-orange-100 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
-                >
-                  <option value="Qwen/Qwen2.5-VL-235B-A22B-Instruct">
-                    Qwen2.5-VL（默认）
-                  </option>
-                  <option value="Qwen/Qwen2.5-VL-235B-A22B-Instruct-Pro">
-                    Qwen2.5-VL-Pro
-                  </option>
-                  <option value="gpt-4o">GPT-4o</option>
-                </select>
+                />
               </div>
             </div>
           </div>
@@ -179,12 +290,21 @@ export default function SettingsPage() {
                   高德地图 API Key
                 </label>
                 <input
-                  type="text"
+                  type="password"
                   value={form.amapKey}
                   onChange={e => handleChange('amapKey', e.target.value)}
-                  placeholder="3fc27acd7a1049fdaaf9cf92177d6ff0"
+                  placeholder={stored.amapKey ? '已保存本地（保持为空即沿用）' : '留空则使用环境变量'}
                   className="w-full px-4 py-3 rounded-2xl border border-orange-100 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
                 />
+                {stored.amapKey && (
+                  <button
+                    type="button"
+                    onClick={() => clearLocalSecret('amapKey')}
+                    className="mt-2 text-xs text-orange-600 hover:text-orange-700"
+                  >
+                    清除本地覆盖
+                  </button>
+                )}
                 <p className="text-xs text-zinc-500 mt-2">
                   获取地址：https://console.amap.com/dev/key/app
                 </p>
@@ -192,13 +312,21 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <button
               type="button"
               onClick={handleReset}
               className="px-6 py-3 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
             >
-              重置默认
+              重置表单
+            </button>
+            <button
+              type="button"
+              onClick={handleTest}
+              disabled={isTesting}
+              className="px-6 py-3 rounded-full border border-orange-300 text-orange-700 hover:bg-orange-50 transition-colors disabled:opacity-60"
+            >
+              {isTesting ? '测试中...' : '连通性测试'}
             </button>
             <button
               type="button"
