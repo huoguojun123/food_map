@@ -1,0 +1,171 @@
+// Bun application setup
+// Provides CORS middleware, error handling, and route registration
+
+import { getDatabase } from './db/connection.js';
+import { handleCreateSpot, handleListSpots, handleGetSpot } from './api/spots.js';
+import { handleAiExtract } from './api/ai.js';
+import { handleGeocode } from './api/geocode.js';
+import { handleUpload } from './api/upload.js';
+
+// Route handler type
+type RouteHandler = (req: Request, url: URL) => Response | Promise<Response>;
+
+// Route registry
+const routes: Map<string, RouteHandler> = new Map();
+
+// Register API routes
+registerRoute('/api/spots', async (req, url) => {
+  if (req.method === 'POST') {
+    return handleCreateSpot(req, url);
+  } else if (req.method === 'GET') {
+    return handleListSpots(req, url);
+  }
+  return Response.json({ error: 'Method not allowed' }, { status: 405 });
+});
+
+registerRoute('/api/spots/', async (req, url) => {
+  if (req.method === 'GET') {
+    return handleGetSpot(req, url);
+  }
+  return Response.json({ error: 'Method not allowed' }, { status: 405 });
+});
+
+registerRoute('/api/ai/extract', async (req, url) => {
+  if (req.method === 'POST') {
+    return handleAiExtract(req);
+  }
+  return Response.json({ error: 'Method not allowed' }, { status: 405 });
+});
+
+registerRoute('/api/ai/geocode', async (req, url) => {
+  if (req.method === 'POST') {
+    return handleGeocode(req);
+  }
+  return Response.json({ error: 'Method not allowed' }, { status: 405 });
+});
+
+registerRoute('/api/upload/r2', async (req, url) => {
+  if (req.method === 'POST') {
+    return handleUpload(req);
+  }
+  return Response.json({ error: 'Method not allowed' }, { status: 405 });
+});
+
+// CORS configuration
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+/**
+ * Register a route handler
+ */
+export function registerRoute(path: string, handler: RouteHandler): void {
+  routes.set(path, handler);
+  console.log(`📡 Route registered: ${path}`);
+}
+
+/**
+ * Apply CORS headers to response
+ */
+function withCors(response: Response): Response {
+  const headers = new Headers(response.headers);
+  Object.entries(CORS_HEADERS).forEach(([key, value]) => {
+    headers.set(key, value);
+  });
+  return new Response(response.body, {
+    status: response.status,
+    headers,
+  });
+}
+
+/**
+ * Handle OPTIONS requests for CORS preflight
+ */
+function handleOptions(): Response {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
+/**
+ * Error handler middleware
+ */
+function handleError(error: unknown): Response {
+  console.error('❌ Server error:', error);
+
+  if (error instanceof Error) {
+    return withCors(
+      Response.json(
+        { error: error.message || 'Internal server error' },
+        { status: 500 }
+      )
+    );
+  }
+
+  return withCors(
+    Response.json({ error: 'Internal server error' }, { status: 500 })
+  );
+}
+
+/**
+ * Main request handler with middleware pipeline
+ */
+export async function handleRequest(req: Request): Promise<Response> {
+  const url = new URL(req.url);
+  const pathname = url.pathname;
+
+  try {
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+      return handleOptions();
+    }
+
+    // Health check
+    if (pathname === '/health') {
+      return withCors(
+        Response.json({
+          status: 'ok',
+          timestamp: new Date().toISOString(),
+          database: 'connected',
+        })
+      );
+    }
+
+    // Match route
+    for (const [route, handler] of routes.entries()) {
+      if (pathname.startsWith(route)) {
+        const response = await handler(req, url);
+        return withCors(response);
+      }
+    }
+
+    // 404 - Not Found
+    return withCors(
+      Response.json({ error: 'Not Found' }, { status: 404 })
+    );
+  } catch (error) {
+    return handleError(error);
+  }
+}
+
+/**
+ * Initialize server (initialize database, setup graceful shutdown)
+ */
+export function initializeServer(): void {
+  // Initialize database
+  getDatabase();
+  console.log('✅ Server initialized');
+
+  // Graceful shutdown
+  const closeDatabase = async () => {
+    console.log('\n🛑 Shutting down server...');
+    const { closeDatabase: dbClose } = await import('./db/connection.js');
+    dbClose();
+    process.exit(0);
+  };
+
+  process.on('SIGINT', closeDatabase);
+  process.on('SIGTERM', closeDatabase);
+}
+
+export default { handleRequest, initializeServer, registerRoute };

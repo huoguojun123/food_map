@@ -10,7 +10,7 @@
 
 **File**: `server/db/connection.ts`
 
-**Status**: [ ] Pending
+**Status**: [x] Completed
 
 **_Leverage**: `lib/db/schema.ts` (数据库建表 SQL)
 
@@ -44,7 +44,7 @@ Success:
 
 **File**: `server/app.ts`
 
-**Status**: [ ] Pending
+**Status**: [x] Completed
 
 **_Leverage**: `server/index.ts` (现有入口)
 
@@ -79,7 +79,7 @@ Success:
 
 **File**: `server/services/openai.ts`
 
-**Status**: [ ] Pending
+**Status**: [x] Completed
 
 **_Leverage**: 无（从零创建）
 
@@ -115,7 +115,7 @@ Success:
 
 **File**: `server/services/amap.ts`
 
-**Status**: [ ] Pending
+**Status**: [x] Completed
 
 **_Leverage**: 无（从零创建）
 
@@ -150,7 +150,7 @@ Success:
 
 **File**: `server/services/r2.ts`
 
-**Status**: [ ] Pending
+**Status**: [x] Completed
 
 **_Leverage**: 无（从零创建）
 
@@ -185,7 +185,7 @@ Success:
 
 **File**: `server/api/spots.ts`
 
-**Status**: [ ] Pending
+**Status**: [x] Completed
 
 **_Leverage**: `server/db/connection.ts` (Task 1), `server/services/openai.ts` (Task 3), `server/services/amap.ts` (Task 4), `server/services/r2.ts` (Task 5)
 
@@ -225,7 +225,7 @@ Success:
 
 **File**: `server/api/ai.ts`
 
-**Status**: [ ] Pending
+**Status**: [x] Completed
 
 **_Leverage**: `server/services/openai.ts` (Task 3)
 
@@ -261,7 +261,7 @@ Success:
 
 **File**: `server/api/geocode.ts`
 
-**Status**: [ ] Pending
+**Status**: [x] Completed
 
 **_Leverage**: `server/services/amap.ts` (Task 4)
 
@@ -296,7 +296,7 @@ Success:
 
 **File**: `server/api/upload.ts`
 
-**Status**: [ ] Pending
+**Status**: [x] Completed
 
 **_Leverage**: `server/services/r2.ts` (Task 5)
 
@@ -332,7 +332,7 @@ Success:
 
 **File**: `lib/api/client.ts`
 
-**Status**: [ ] Pending
+**Status**: [x] Completed
 
 **_Leverage**: 无（从零创建）
 
@@ -366,7 +366,7 @@ Success:
 
 **File**: `lib/api/spots.ts`
 
-**Status**: [ ] Pending
+**Status**: [x] Completed
 
 **_Leverage**: `lib/api/client.ts` (Task 10), `lib/types/index.ts` (类型定义)
 
@@ -403,7 +403,7 @@ Success:
 
 **File**: `components/features/image-upload.tsx`
 
-**Status**: [ ] Pending
+**Status**: [x] Completed
 
 **_Leverage**: `lib/api/client.ts` (Task 11), Tailwind CSS 样式
 
@@ -441,7 +441,7 @@ Success:
 
 **File**: `components/forms/spot-form.tsx`
 
-**Status**: [ ] Pending
+**Status**: [x] Completed
 
 **_Leverage**: `lib/api/client.ts` (Task 11), `lib/types/index.ts` (类型定义)
 
@@ -479,7 +479,7 @@ Success:
 
 **File**: `components/layout/omnibar.tsx`
 
-**Status**: [ ] Pending
+**Status**: [x] Completed
 
 **_Leverage**: `ImageUpload` (Task 12), `SpotForm` (Task 13), `lib/api/ai.ts` (Task 11)
 
@@ -518,7 +518,7 @@ Success:
 
 **File**: `app/page.tsx` (更新现有)
 
-**Status**: [ ] Pending
+**Status**: [x] Completed
 
 **_Leverage**: `Omnibar` (Task 14), `app/layout.tsx` (现有布局), `lib/api/client.ts` (Task 11)
 
