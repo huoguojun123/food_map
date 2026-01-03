@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gourmetlog-v1'
+const CACHE_NAME = 'gourmetlog-v2'
 const urlsToCache = ['/', '/manifest.json', '/icon.svg']
 
 self.addEventListener('install', event => {

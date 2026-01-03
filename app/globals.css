@@ -9,6 +9,7 @@
   --accent: #d97b36;
   --accent-deep: #b45a24;
   --ring: rgba(217, 123, 54, 0.35);
+  color-scheme: light;
 }
 
 body {

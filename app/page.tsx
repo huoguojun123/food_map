@@ -16,6 +16,10 @@ export default function HomePage() {
   }, [])
 
   useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') {
+      return
+    }
+
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(err => {
         console.error('Service Worker registration failed:', err)
