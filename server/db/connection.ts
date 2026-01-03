@@ -1,70 +1,61 @@
 // Database connection module for SQLite
 // Uses bun:sqlite (built-in) for Bun compatibility
 
-import { Database } from 'bun:sqlite';
-import { createTables, insertSampleData } from '../../lib/db/schema.js';
+import { Database } from 'bun:sqlite'
+import { createTables, insertSampleData } from '../../lib/db/schema.js'
 
-// Database path from environment variable or default
-const DATABASE_PATH = process.env.DATABASE_PATH || './data/gourmetlog.db';
+const DATABASE_PATH = process.env.DATABASE_PATH || './data/gourmetlog.db'
 
-// Create database connection
-let db: Database.Database | null = null;
+let db: Database | null = null
 
-export function getDatabase(): Database.Database {
+export function getDatabase(): Database {
   if (!db) {
-    // Ensure data directory exists
-    const fs = require('fs');
-    const path = require('path');
-    const dbDir = path.dirname(DATABASE_PATH);
+    const fs = require('fs')
+    const path = require('path')
+    const dbDir = path.dirname(DATABASE_PATH)
 
     if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true });
+      fs.mkdirSync(dbDir, { recursive: true })
     }
 
-    // Open database connection
-    db = new Database(DATABASE_PATH);
+    db = new Database(DATABASE_PATH)
+    db.exec('PRAGMA journal_mode = WAL')
 
-    // Enable WAL mode for better performance
-    db.exec('PRAGMA journal_mode = WAL');
+    initializeDatabase()
 
-    // Initialize tables
-    initializeDatabase();
-
-    console.log('✅ Database connected at:', DATABASE_PATH);
+    console.log('✅ Database connected at:', DATABASE_PATH)
   }
 
-  return db;
+  return db
 }
 
 function initializeDatabase(): void {
   if (!db) {
-    throw new Error('Database not initialized');
+    throw new Error('Database not initialized')
   }
 
   try {
-    // Execute table creation scripts
-    db.exec(createTables);
+    db.exec(createTables)
 
-    // Check if we need to insert sample data
-    const spotCount = db.prepare('SELECT COUNT(*) as count FROM food_spots').get() as { count: number };
+    const spotCount = db
+      .prepare('SELECT COUNT(*) as count FROM food_spots')
+      .get() as { count: number }
     if (spotCount.count === 0) {
-      db.exec(insertSampleData);
-      console.log('📝 Sample data inserted');
+      db.exec(insertSampleData)
+      console.log('📝 Sample data inserted')
     }
   } catch (error) {
-    console.error('❌ Database initialization failed:', error);
-    throw error;
+    console.error('❌ Database initialization failed:', error)
+    throw error
   }
 }
 
-// Close database connection (for graceful shutdown)
 export function closeDatabase(): void {
   if (db) {
-    db.close();
-    db = null;
-    console.log('🔌 Database connection closed');
+    db.close()
+    db = null
+    console.log('🔌 Database connection closed')
   }
 }
 
-// Export for use in API routes
-export default { getDatabase, closeDatabase };
+export default { getDatabase, closeDatabase }
