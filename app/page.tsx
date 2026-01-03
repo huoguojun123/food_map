@@ -59,211 +59,228 @@ export default function HomePage() {
     }
   }
 
+  const getImageUrls = (spot: FoodSpot): string[] => {
+    const urls: string[] = []
+
+    if (spot.screenshot_urls) {
+      try {
+        const parsed = JSON.parse(spot.screenshot_urls)
+        if (Array.isArray(parsed)) {
+          urls.push(...parsed.filter(url => typeof url === 'string'))
+        }
+      } catch {
+        // ignore invalid json
+      }
+    }
+
+    if (spot.screenshot_r2_key && spot.screenshot_r2_key.startsWith('http')) {
+      urls.push(spot.screenshot_r2_key)
+    }
+
+    return urls
+  }
+
   return (
-    <div className="min-h-screen pb-32">
-      <header className="border-b border-zinc-200/50 dark:border-zinc-800/50 backdrop-blur-md bg-white/50 dark:bg-zinc-950/50 sticky top-0 z-40">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
+    <div className="min-h-screen pb-40">
+      <header className="sticky top-0 z-40 backdrop-blur-lg bg-white/70 border-b border-orange-100">
+        <div className="max-w-5xl mx-auto px-6 py-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center shadow-sm">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <h1 className="text-3xl font-semibold font-display text-orange-600">
                 GourmetLog
               </h1>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
-                <Sparkles className="h-3 w-3" />
-                私人美食外脑
-              </p>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="text-xs text-zinc-400 dark:text-zinc-600 bg-zinc-100 dark:bg-zinc-800 px-3 py-1.5 rounded-full">
-                {spots.length} 个记录
-              </div>
-              <a
-                href="/settings"
-                className="text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
-              >
-                设置
-              </a>
+            <p className="text-sm text-zinc-600 flex items-center gap-2">
+              <span className="inline-flex h-2 w-2 rounded-full bg-orange-400" />
+              私人美食外脑 · 温暖留白的美食时间线
+            </p>
+          </div>
+          <div className="flex items-center gap-3 text-sm">
+            <div className="mag-chip px-4 py-2 rounded-full text-zinc-600">
+              {spots.length} 个记录
             </div>
+            <a
+              href="/settings"
+              className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+            >
+              设置
+            </a>
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-5xl mx-auto px-6 py-10">
         {isLoading ? (
-          <div className="flex items-center justify-center py-20">
+          <div className="flex items-center justify-center py-24">
             <div className="relative">
-              <div className="animate-spin h-12 w-12 border-4 border-zinc-200 border-t-orange-500 rounded-full" />
+              <div className="animate-spin h-12 w-12 border-4 border-orange-200 border-t-orange-500 rounded-full" />
               <div className="absolute inset-0 flex items-center justify-center">
                 <Sparkles className="h-5 w-5 text-orange-500 animate-pulse" />
               </div>
             </div>
           </div>
         ) : error ? (
-          <div className="bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border-2 border-red-200 dark:border-red-800 rounded-3xl p-8 text-center">
-            <div className="bg-red-100 dark:bg-red-900/30 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-              <Plus className="h-8 w-8 text-red-600 dark:text-red-400" />
+          <div className="mag-card rounded-[32px] p-10 text-center">
+            <div className="bg-orange-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <Plus className="h-8 w-8 text-orange-600" />
             </div>
-            <p className="text-red-700 dark:text-red-300 font-medium">{error}</p>
+            <p className="text-orange-700 font-medium">{error}</p>
           </div>
         ) : spots.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="bg-gradient-to-br from-orange-100 to-orange-50 dark:from-orange-900/30 dark:to-orange-800/20 rounded-full w-32 h-32 mx-auto mb-8 flex items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/20 to-orange-600/20 animate-pulse" />
-              <Sparkles className="h-16 w-16 text-orange-600 dark:text-orange-400 relative z-10" />
-            </div>
-            <h2 className="text-3xl font-bold mb-3 bg-gradient-to-r from-zinc-900 to-zinc-700 dark:from-zinc-100 dark:to-zinc-300 bg-clip-text text-transparent">
-              开始记录你的美食之旅
-            </h2>
-            <p className="text-zinc-600 dark:text-zinc-400 mb-2">
-              使用底部输入栏添加餐厅，通过 AI 自动识别
-            </p>
-            <div className="flex items-center justify-center gap-6 mt-6 text-sm text-zinc-500 dark:text-zinc-500">
-              <div className="flex items-center gap-2">
-                <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded-lg">
-                  <Plus className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                </div>
-                <span>图片上传</span>
+          <div className="text-center py-24">
+            <div className="mag-card rounded-[40px] p-10 max-w-xl mx-auto">
+              <div className="bg-orange-100 rounded-full w-28 h-28 mx-auto mb-6 flex items-center justify-center">
+                <Sparkles className="h-14 w-14 text-orange-600" />
               </div>
-              <div className="flex items-center gap-2">
-                <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded-lg">
-                  <Sparkles className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                </div>
-                <span>AI 自动识别</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded-lg">
-                  <MapPin className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                </div>
-                <span>自动地理编码</span>
+              <h2 className="text-3xl font-display text-zinc-900 mb-3">
+                开始记录你的美食之旅
+              </h2>
+              <p className="text-zinc-600 mb-6">
+                添加截图、链接或文字，让 AI 帮你整理成柔和的美食档案。
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-zinc-500">
+                <span className="mag-chip px-4 py-2 rounded-full">多图上传</span>
+                <span className="mag-chip px-4 py-2 rounded-full">链接识别</span>
+                <span className="mag-chip px-4 py-2 rounded-full">AI 自动总结</span>
               </div>
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 mb-6 px-2">
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-8">
               <Clock className="h-5 w-5 text-orange-500" />
-              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+              <h3 className="text-lg font-semibold text-zinc-800 font-display">
                 最近记录
               </h3>
-              <div className="flex-1 h-px bg-gradient-to-r from-zinc-200 to-transparent dark:from-zinc-700" />
+              <div className="flex-1 h-px bg-gradient-to-r from-orange-200 to-transparent" />
             </div>
 
-            {spots.map((spot, index) => (
-              <div
-                key={spot.id}
-                className="group bg-white dark:bg-zinc-900 rounded-3xl border-2 border-zinc-200 dark:border-zinc-700 p-6 hover:border-orange-300 dark:hover:border-orange-700 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/10 relative overflow-hidden"
-                style={{
-                  animation: `fadeInUp 0.5s ease-out ${index * 0.1}s both`,
-                }}
-              >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-orange-500/5 to-transparent rounded-bl-full group-hover:from-orange-500/10 transition-colors" />
+            {spots.map((spot, index) => {
+              const images = getImageUrls(spot)
 
-                <div className="flex items-start justify-between gap-4 relative z-10">
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-1 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
-                      {spot.name}
-                    </h3>
-                    {spot.city && (
-                      <span className="text-sm text-zinc-500 dark:text-zinc-400 inline-flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {spot.city}
-                      </span>
+              return (
+                <div
+                  key={spot.id}
+                  className="mag-card rounded-[32px] p-6 md:p-8 space-y-6"
+                  style={{
+                    animation: `fadeInUp 0.6s ease-out ${index * 0.1}s both`,
+                  }}
+                >
+                  {images.length > 0 && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="col-span-2 md:col-span-1 overflow-hidden rounded-2xl border border-orange-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={images[0]}
+                          alt={spot.name}
+                          className="h-44 w-full object-cover"
+                        />
+                      </div>
+                      <div className="hidden md:grid grid-rows-2 gap-3">
+                        {images.slice(1, 3).map((url, idx) => (
+                          <div key={`${url}-${idx}`} className="overflow-hidden rounded-2xl border border-orange-100">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={url}
+                              alt={`${spot.name}-${idx}`}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-2xl font-display text-zinc-900 mb-2">
+                        {spot.name}
+                      </h3>
+                      {spot.city && (
+                        <span className="text-sm text-zinc-500 inline-flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {spot.city}
+                        </span>
+                      )}
+                    </div>
+                    {spot.rating !== undefined && spot.rating !== null && (
+                      <div className="mag-chip px-4 py-2 rounded-full flex items-center gap-1.5 text-orange-600">
+                        <Star className="h-4 w-4 fill-orange-500" />
+                        <span className="font-semibold">{spot.rating.toFixed(1)}</span>
+                      </div>
                     )}
                   </div>
-                  {spot.rating !== undefined && spot.rating !== null && (
-                    <div className="flex items-center gap-1.5 bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30 px-4 py-2 rounded-2xl">
-                      <Star className="h-4 w-4 text-orange-600 dark:text-orange-400 fill-orange-600 dark:fill-orange-400" />
-                      <span className="text-sm font-bold text-orange-700 dark:text-orange-300">
-                        {spot.rating.toFixed(1)}
-                      </span>
-                    </div>
-                  )}
-                </div>
 
-                {spot.summary && (
-                  <div className="my-4">
-                    <div className="inline-flex items-start gap-2 bg-gradient-to-r from-zinc-50 to-orange-50 dark:from-zinc-800/50 dark:to-orange-900/20 rounded-2xl px-4 py-3">
-                      <Sparkles className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                        {spot.summary}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-3 relative z-10">
-                  {spot.address_text && (
-                    <div className="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-                      <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5 text-zinc-400" />
-                      <span className="break-words">{spot.address_text}</span>
+                  {spot.summary && (
+                    <div className="bg-orange-50/70 rounded-2xl px-4 py-3">
+                      <p className="text-sm text-orange-800">{spot.summary}</p>
                     </div>
                   )}
 
-                  {spot.price !== undefined && spot.price !== null && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-orange-600 dark:text-orange-400 font-bold">¥</span>
-                      <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-lg">
-                        {spot.price}
-                      </span>
-                      <span className="text-zinc-500 dark:text-zinc-500">/人均</span>
-                    </div>
-                  )}
+                  <div className="space-y-3">
+                    {spot.address_text && (
+                      <div className="flex items-start gap-2 text-sm text-zinc-600">
+                        <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5 text-orange-300" />
+                        <span className="break-words">{spot.address_text}</span>
+                      </div>
+                    )}
 
-                  {spot.tags && (
-                    <div className="flex flex-wrap gap-2">
-                      {getTagList(spot.tags).map((tag: string, idx: number) => (
-                        <span
-                          key={idx}
-                          className="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-zinc-100 to-zinc-50 dark:from-zinc-800 dark:to-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl border border-zinc-200 dark:border-zinc-700"
-                        >
-                          {tag}
+                    {spot.price !== undefined && spot.price !== null && (
+                      <div className="flex items-center gap-2 text-sm text-zinc-600">
+                        <span className="text-orange-500 font-semibold">¥</span>
+                        <span className="font-semibold text-zinc-900 text-lg">
+                          {spot.price}
                         </span>
-                      ))}
-                    </div>
-                  )}
+                        <span className="text-zinc-500">/人均</span>
+                      </div>
+                    )}
 
-                  {spot.my_notes && (
-                    <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                        <span className="font-semibold text-zinc-700 dark:text-zinc-300">💬 笔记：</span>
-                        {spot.my_notes}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                    {spot.tags && (
+                      <div className="flex flex-wrap gap-2">
+                        {getTagList(spot.tags).map((tag: string, idx: number) => (
+                          <span
+                            key={idx}
+                            className="mag-chip px-3 py-1.5 text-xs text-zinc-600 rounded-full"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
-                <div className="flex items-center gap-2 mt-5 pt-4 border-t border-zinc-200 dark:border-zinc-700 relative z-10">
-                  <Clock className="h-3.5 w-3.5 text-zinc-400" />
-                  <span className="text-xs text-zinc-500 dark:text-zinc-500 font-medium">
-                    {new Date(spot.created_at).toLocaleDateString('zh-CN', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
+                    {spot.my_notes && (
+                      <div className="mt-4 pt-4 border-t border-orange-100">
+                        <p className="text-sm text-zinc-600">
+                          <span className="font-medium text-orange-600">💬 笔记：</span>
+                          {spot.my_notes}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-4 border-t border-orange-100 text-xs text-zinc-500">
+                    <Clock className="h-3.5 w-3.5 text-orange-300" />
+                    <span>
+                      {new Date(spot.created_at).toLocaleDateString('zh-CN', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </main>
 
       <Omnibar onSpotCreate={handleSpotCreate} />
-
-      <style jsx>{`
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
     </div>
   )
 }

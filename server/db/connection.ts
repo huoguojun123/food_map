@@ -36,6 +36,7 @@ function initializeDatabase(): void {
 
   try {
     db.exec(createTables)
+    ensureColumns()
 
     const spotCount = db
       .prepare('SELECT COUNT(*) as count FROM food_spots')
@@ -47,6 +48,25 @@ function initializeDatabase(): void {
   } catch (error) {
     console.error('Database initialization failed:', error)
     throw error
+  }
+}
+
+function ensureColumns(): void {
+  if (!db) {
+    return
+  }
+
+  const columns = db.prepare('PRAGMA table_info(food_spots)').all() as Array<{
+    name: string
+  }>
+  const columnSet = new Set(columns.map(column => column.name))
+
+  if (!columnSet.has('screenshot_urls')) {
+    db.exec('ALTER TABLE food_spots ADD COLUMN screenshot_urls TEXT')
+  }
+
+  if (!columnSet.has('source_url')) {
+    db.exec('ALTER TABLE food_spots ADD COLUMN source_url TEXT')
   }
 }
 

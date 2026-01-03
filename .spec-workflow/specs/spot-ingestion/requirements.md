@@ -22,7 +22,7 @@
 #### Acceptance Criteria
 
 1. WHEN 用户点击 Omnibar 中的图片上传按钮 THEN 系统 SHALL 打开文件选择器
-2. WHEN 用户选择图片文件 THEN 系统 SHALL 预览图片并上传到服务器
+2. WHEN 用户选择图片文件 THEN 系统 SHALL 预览图片并支持多图选择与移除
 3. WHEN 图片上传完成 THEN 系统 SHALL 调用 AI Vision API 进行识别
 4. WHEN AI 识别返回结果 THEN 系统 SHALL 解析并显示提取的信息（店名、地址、评分、价格、菜品、氛围）
 5. IF AI 识别失败 THEN 系统 SHALL 允许用户手动编辑提取的信息
@@ -37,6 +37,7 @@
 2. WHEN 检测到文本输入 THEN 系统 SHALL 调用 AI API 进行文本解析
 3. WHEN AI 解析完成 THEN 系统 SHALL 提取有效信息并展示给用户确认
 4. IF 提取的信息不完整 THEN 系统 SHALL 高亮缺失字段并提示用户补充
+5. WHEN 用户粘贴可访问的链接 THEN 系统 SHALL 自动抓取页面内容并走 AI 解析流程
 
 ### Requirement 3 - 地理编码
 

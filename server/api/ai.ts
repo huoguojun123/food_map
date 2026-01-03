@@ -11,9 +11,9 @@ export async function handleAiExtract(req: Request): Promise<Response> {
     const body = await req.json();
 
     // Validate request body
-    if (!body.type || (body.type !== 'image' && body.type !== 'text')) {
+    if (!body.type || (body.type !== 'image' && body.type !== 'text' && body.type !== 'url')) {
       return Response.json(
-        { error: 'Invalid type, must be "image" or "text"' },
+        { error: 'Invalid type, must be "image", "text" or "url"' },
         { status: 400 }
       );
     }
@@ -50,6 +50,38 @@ export async function handleAiExtract(req: Request): Promise<Response> {
       });
     }
 
+    // Handle URL extraction
+    if (body.type === 'url') {
+      if (!body.url || typeof body.url !== 'string') {
+        return Response.json(
+          { error: 'URL is required for url type' },
+          { status: 400 }
+        );
+      }
+
+      const normalizedUrl = normalizeUrl(body.url);
+      if (!normalizedUrl) {
+        return Response.json(
+          { error: 'Invalid URL format' },
+          { status: 400 }
+        );
+      }
+
+      if (!isSafeUrl(normalizedUrl)) {
+        return Response.json(
+          { error: 'URL is not allowed' },
+          { status: 400 }
+        );
+      }
+
+      const pageText = await fetchPageText(normalizedUrl);
+      const result = await extractFromText(pageText);
+      return Response.json({
+        success: true,
+        data: result,
+      });
+    }
+
     // Should not reach here
     return Response.json(
       { error: 'Invalid request' },
@@ -71,4 +103,81 @@ export async function handleAiExtract(req: Request): Promise<Response> {
       { status: 500 }
     );
   }
+}
+
+function normalizeUrl(value: string): string | null {
+  try {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    const url = trimmed.startsWith('http://') || trimmed.startsWith('https://')
+      ? new URL(trimmed)
+      : new URL(`https://${trimmed}`);
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function isSafeUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return false;
+    }
+    const hostname = url.hostname.toLowerCase();
+    if (hostname === 'localhost' || hostname.endsWith('.local')) {
+      return false;
+    }
+    if (isPrivateIp(hostname)) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isPrivateIp(hostname: string): boolean {
+  const parts = hostname.split('.');
+  if (parts.length !== 4) {
+    return false;
+  }
+  const octets = parts.map(part => Number(part));
+  if (octets.some(value => Number.isNaN(value))) {
+    return false;
+  }
+  const [a, b] = octets;
+  if (a === 10) return true;
+  if (a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  return false;
+}
+
+async function fetchPageText(url: string): Promise<string> {
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'GourmetLogBot/1.0',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch URL: ${response.status}`);
+  }
+
+  const html = await response.text();
+  const clipped = html.slice(0, 20000);
+  return extractPlainText(clipped);
+}
+
+function extractPlainText(html: string): string {
+  const withoutScripts = html
+    .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, ' ')
+    .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, ' ');
+  const withoutTags = withoutScripts.replace(/<[^>]+>/g, ' ');
+  return withoutTags.replace(/\\s+/g, ' ').trim().slice(0, 4000);
 }

@@ -1,4 +1,4 @@
-// Database schema for SQLite
+﻿// Database schema for SQLite
 // This file contains the SQL schema creation scripts
 
 export const createTables = `
@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS food_spots (
 
   -- Source
   original_share_text TEXT,
-  screenshot_r2_key TEXT, -- Image path in R2
+  source_url TEXT,
+  screenshot_r2_key TEXT, -- Legacy single image key
+  screenshot_urls TEXT, -- JSON Array of image URLs
 
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -51,6 +53,6 @@ export const insertSampleData = `
 -- Sample spot for testing
 INSERT INTO food_spots (name, lat, lng, address_text, city, summary, tags, rating, price)
 VALUES
-  ('示例餐厅', 39.9042, 116.4074, '北京市东城区王府井大街8号', '北京', '排队两小时的火锅店', '["火锅", "聚会"]', 4.5, 150)
+  ('示例餐厅', 39.9042, 116.4074, '北京市东城区王府井大街1号', '北京', '排队两小时的火锅店', '["火锅", "聚会"]', 4.5, 150)
 ON CONFLICT DO NOTHING;
 `;

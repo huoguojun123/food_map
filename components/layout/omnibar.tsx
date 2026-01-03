@@ -13,8 +13,8 @@ interface OmnibarProps {
 
 export default function Omnibar({ onSpotCreate }: OmnibarProps) {
   const [inputText, setInputText] = useState('')
-  const [selectedImage, setSelectedImage] = useState<File | null>(null)
-  const [uploadedImageKey, setUploadedImageKey] = useState<string | null>(null)
+  const [selectedImages, setSelectedImages] = useState<File[]>([])
+  const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([])
   const [isExtracting, setIsExtracting] = useState(false)
   const [previewSpot, setPreviewSpot] = useState<CreateSpotDto | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -29,35 +29,46 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
     const text = e.clipboardData.getData('text/plain')
     if (text && text.trim().length > 0) {
       setInputText(text)
-      await extractFromText(text)
+      await extractFromTextOrUrl(text)
     }
   }
 
-  const handleImageSelect = async (file: File) => {
-    setSelectedImage(file)
-    setUploadedImageKey(null)
-    await extractFromImage(file)
+  const handleImagesSelect = async (files: File[]) => {
+    setSelectedImages(files)
+    setUploadedImageUrls([])
+    setError(null)
+    if (files.length > 0 && !inputText.trim()) {
+      await extractFromImage(files[0])
+    }
   }
 
-  const handleImageUpload = async (file: File) => {
+  const handleImagesUpload = async (files: File[]) => {
     try {
-      const result = await uploadImageToR2(file)
-      setUploadedImageKey(result.key)
+      const urls: string[] = []
+      for (const file of files) {
+        const result = await uploadImageToR2(file)
+        if (result.url) {
+          urls.push(result.url)
+        }
+      }
+      setUploadedImageUrls(urls)
       if (previewSpot) {
-        setPreviewSpot({ ...previewSpot, screenshot_r2_key: result.key })
+        setPreviewSpot({ ...previewSpot, screenshot_urls: urls })
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '图片上传失败')
     }
   }
 
-  const extractFromText = async (text: string) => {
+  const extractFromTextOrUrl = async (text: string) => {
     setIsExtracting(true)
     setError(null)
 
     try {
-      const result = await extractSpotInfo({ type: 'text', text })
-      createPreviewSpot(result, text)
+      const trimmed = text.trim()
+      const isUrl = isLikelyUrl(trimmed)
+      const result = await extractSpotInfo(isUrl ? { type: 'url', url: trimmed } : { type: 'text', text })
+      createPreviewSpot(result, text, isUrl ? trimmed : undefined)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'AI 识别失败，请手动输入')
       createFallbackSpot(text)
@@ -91,7 +102,7 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
     }
   }
 
-  const createPreviewSpot = (result: AiExtractionResult, originalText?: string) => {
+  const createPreviewSpot = (result: AiExtractionResult, originalText?: string, sourceUrl?: string) => {
     const spot: CreateSpotDto = {
       name: result.name,
       summary: result.summary,
@@ -100,7 +111,8 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
       rating: result.rating,
       tags: result.dishes || [],
       original_share_text: originalText,
-      screenshot_r2_key: uploadedImageKey ?? undefined,
+      source_url: sourceUrl,
+      screenshot_urls: uploadedImageUrls.length > 0 ? uploadedImageUrls : undefined,
       lat: undefined,
       lng: undefined,
     }
@@ -118,7 +130,7 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
       rating: undefined,
       tags: [],
       original_share_text: originalText,
-      screenshot_r2_key: uploadedImageKey ?? undefined,
+      screenshot_urls: uploadedImageUrls.length > 0 ? uploadedImageUrls : undefined,
       lat: undefined,
       lng: undefined,
     }
@@ -138,23 +150,27 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
 
   const resetOmnibar = () => {
     setInputText('')
-    setSelectedImage(null)
-    setUploadedImageKey(null)
+    setSelectedImages([])
+    setUploadedImageUrls([])
     setPreviewSpot(null)
     setError(null)
     setIsExtracting(false)
     setShowForm(false)
   }
 
+  const isLikelyUrl = (value: string) => {
+    return /^(https?:\/\/)?[\w.-]+\.[a-z]{2,}/i.test(value)
+  }
+
   return (
     <>
-      <div className="fixed bottom-0 left-0 right-0 backdrop-blur-md bg-white/90 dark:bg-zinc-950/90 border-t border-zinc-200 dark:border-zinc-800 shadow-lg">
+      <div className="fixed bottom-0 left-0 right-0 backdrop-blur-xl bg-white/80 dark:bg-zinc-950/80 border-t border-zinc-200/70 dark:border-zinc-800 shadow-[0_-12px_30px_-20px_rgba(0,0,0,0.3)]">
         {!showForm && (
-          <div className="max-w-4xl mx-auto px-4 py-3 flex gap-3">
+          <div className="max-w-5xl mx-auto px-4 py-4 flex flex-col gap-4 md:flex-row">
             <ImageUpload
-              onImageSelect={handleImageSelect}
-              onImageUpload={handleImageUpload}
-              className="flex-shrink-0"
+              onImagesSelect={handleImagesSelect}
+              onImagesUpload={handleImagesUpload}
+              className="md:w-72"
             />
 
             <div className="flex-1 relative">
@@ -164,52 +180,63 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
                 value={inputText}
                 onChange={e => setInputText(e.target.value)}
                 onPaste={handleTextPaste}
-                placeholder="粘贴分享文本，或点击图片按钮上传截图..."
+                placeholder="粘贴分享文本或链接，或上传多张截图..."
                 disabled={isExtracting}
-                className="w-full px-5 py-3 pr-12 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-zinc-100 dark:disabled:bg-zinc-800 disabled:opacity-60"
+                className="w-full px-5 py-4 pr-12 rounded-2xl border border-zinc-200/80 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-400/70 disabled:bg-zinc-100/80"
               />
               {inputText && (
                 <button
                   type="button"
                   onClick={() => setInputText('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-zinc-600"
                 >
                   <X className="h-4 w-4" />
                 </button>
               )}
+
+              <div className="mt-3 flex items-center gap-3 text-xs text-zinc-500">
+                <span>支持多图、文本、链接混合</span>
+                {selectedImages.length > 0 && (
+                  <span>已选 {selectedImages.length} 张图片</span>
+                )}
+              </div>
             </div>
 
-            {inputText || selectedImage ? (
-              <button
-                type="button"
-                onClick={() => (inputText ? extractFromText(inputText) : undefined)}
-                disabled={isExtracting}
-                className="flex-shrink-0 p-3 rounded-xl bg-orange-500 text-white font-medium hover:bg-orange-600 disabled:bg-orange-400 disabled:cursor-not-allowed transition-colors"
-              >
-                {isExtracting ? (
-                  <span className="flex items-center gap-2">
-                    <span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
-                    AI 识别中...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <Send className="h-5 w-5" />
-                    提取信息
-                  </span>
-                )}
-              </button>
-            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                if (inputText.trim()) {
+                  extractFromTextOrUrl(inputText)
+                } else if (selectedImages[0]) {
+                  extractFromImage(selectedImages[0])
+                }
+              }}
+              disabled={isExtracting || (!inputText.trim() && selectedImages.length === 0)}
+              className="flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-orange-500 text-white font-semibold hover:bg-orange-600 disabled:bg-orange-300 disabled:cursor-not-allowed transition-colors"
+            >
+              {isExtracting ? (
+                <>
+                  <span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
+                  识别中...
+                </>
+              ) : (
+                <>
+                  <Send className="h-5 w-5" />
+                  解析并继续
+                </>
+              )}
+            </button>
           </div>
         )}
 
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800 px-4 py-3">
-            <div className="max-w-4xl mx-auto flex items-center justify-between">
-              <p className="text-red-700 dark:text-red-300 flex-1">{error}</p>
+          <div className="bg-red-50 border-t border-red-200 px-4 py-3">
+            <div className="max-w-5xl mx-auto flex items-center justify-between">
+              <p className="text-red-700 flex-1">{error}</p>
               <button
                 type="button"
                 onClick={() => setError(null)}
-                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+                className="text-red-600 hover:text-red-800"
               >
                 <X className="h-5 w-5" />
               </button>

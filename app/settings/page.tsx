@@ -82,57 +82,49 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 pb-32">
-      <header className="border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-40 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                设置
-              </h1>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                管理 AI 与地图服务配置
-              </p>
-            </div>
-            <a
-              href="/"
-              className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
-            >
-              返回首页
-            </a>
+    <div className="min-h-screen pb-32">
+      <header className="sticky top-0 z-40 backdrop-blur-lg bg-white/70 border-b border-orange-100">
+        <div className="max-w-5xl mx-auto px-6 py-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-display text-zinc-900">设置</h1>
+            <p className="text-sm text-zinc-600">管理 AI 与地图服务配置</p>
           </div>
+          <a
+            href="/"
+            className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+          >
+            返回首页
+          </a>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8">
+      <main className="max-w-3xl mx-auto px-6 py-10">
         <div className="space-y-8">
           {saveMessage && (
             <div
-              className={`p-4 rounded-2xl border-2 ${
+              className={`p-4 rounded-2xl border ${
                 saveMessage.type === 'success'
-                  ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300'
-                  : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'
+                  ? 'bg-green-50 border-green-200 text-green-800'
+                  : 'bg-red-50 border-red-200 text-red-800'
               }`}
             >
               <div className="flex items-center gap-2">
                 {saveMessage.type === 'success' ? (
-                  <Save className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <Save className="h-5 w-5 text-green-600" />
                 ) : (
-                  <span className="text-red-600 dark:text-red-400 text-lg">⚠️</span>
+                  <span className="text-red-600 text-lg">⚠️</span>
                 )}
                 <p className="font-medium">{saveMessage.text}</p>
               </div>
             </div>
           )}
 
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 p-6 shadow-lg">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-6 pb-4 border-b border-zinc-200 dark:border-zinc-800">
-              AI 配置
-            </h2>
+          <div className="mag-card rounded-[32px] p-6 shadow-sm">
+            <h2 className="text-xl font-display text-zinc-900 mb-6">AI 配置</h2>
 
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                <label className="block text-sm font-medium text-zinc-700 mb-2">
                   API Key
                 </label>
                 <input
@@ -140,12 +132,12 @@ export default function SettingsPage() {
                   value={form.aiKey}
                   onChange={e => handleChange('aiKey', e.target.value)}
                   placeholder="sk-...（仅保存在本机）"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-3 rounded-2xl border border-orange-100 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                <label className="block text-sm font-medium text-zinc-700 mb-2">
                   API Base URL
                 </label>
                 <input
@@ -153,18 +145,18 @@ export default function SettingsPage() {
                   value={form.aiBaseUrl}
                   onChange={e => handleChange('aiBaseUrl', e.target.value)}
                   placeholder="https://api.siliconflow.cn/v1"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-3 rounded-2xl border border-orange-100 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                <label className="block text-sm font-medium text-zinc-700 mb-2">
                   模型
                 </label>
                 <select
                   value={form.aiModel}
                   onChange={e => handleChange('aiModel', e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-3 rounded-2xl border border-orange-100 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
                 >
                   <option value="Qwen/Qwen2.5-VL-235B-A22B-Instruct">
                     Qwen2.5-VL（默认）
@@ -178,14 +170,12 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 p-6 shadow-lg">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-6 pb-4 border-b border-zinc-200 dark:border-zinc-800">
-              地图配置
-            </h2>
+          <div className="mag-card rounded-[32px] p-6 shadow-sm">
+            <h2 className="text-xl font-display text-zinc-900 mb-6">地图配置</h2>
 
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                <label className="block text-sm font-medium text-zinc-700 mb-2">
                   高德地图 API Key
                 </label>
                 <input
@@ -193,20 +183,20 @@ export default function SettingsPage() {
                   value={form.amapKey}
                   onChange={e => handleChange('amapKey', e.target.value)}
                   placeholder="3fc27acd7a1049fdaaf9cf92177d6ff0"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-3 rounded-2xl border border-orange-100 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
                 />
-                <p className="text-xs text-zinc-500 dark:text-zinc-600 mt-1">
+                <p className="text-xs text-zinc-500 mt-2">
                   获取地址：https://console.amap.com/dev/key/app
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-2">
+          <div className="flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={handleReset}
-              className="px-6 py-3 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+              className="px-6 py-3 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
             >
               重置默认
             </button>
@@ -214,7 +204,7 @@ export default function SettingsPage() {
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-orange-700 disabled:from-orange-400 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-orange-500/25 disabled:shadow-none"
+              className="flex items-center gap-2 px-6 py-3 rounded-full bg-orange-500 text-white font-semibold hover:bg-orange-600 disabled:bg-orange-300 disabled:cursor-not-allowed transition-colors"
             >
               {isSaving ? (
                 <>

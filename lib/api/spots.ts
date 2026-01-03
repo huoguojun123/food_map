@@ -8,7 +8,7 @@ import type { FoodSpot, CreateSpotDto, AiExtractionResult } from '../types/index
  * Extract restaurant info from image or text using AI
  */
 export async function extractSpotInfo(
-  input: { type: 'image' | 'text'; image?: string; text?: string }
+  input: { type: 'image' | 'text' | 'url'; image?: string; text?: string; url?: string }
 ): Promise<AiExtractionResult> {
   const response = await apiClient.post<{ success: boolean; data: AiExtractionResult; error?: string }>(
     '/api/ai/extract',

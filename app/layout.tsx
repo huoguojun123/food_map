@@ -1,5 +1,20 @@
 ﻿import type { Metadata } from 'next'
+import { Noto_Sans_SC, Noto_Serif_SC } from 'next/font/google'
 import './globals.css'
+
+const bodyFont = Noto_Sans_SC({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-body',
+  display: 'swap',
+})
+
+const displayFont = Noto_Serif_SC({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-display',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'GourmetLog - 私人美食外脑',
@@ -25,7 +40,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#f97316" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
-      <body className="bg-gradient-to-br from-zinc-50 via-white to-zinc-100 dark:from-zinc-900 via-zinc-950 to-zinc-100 dark:text-zinc-100 min-h-screen">
+      <body className={`${bodyFont.variable} ${displayFont.variable} min-h-screen`}>
         {children}
       </body>
     </html>

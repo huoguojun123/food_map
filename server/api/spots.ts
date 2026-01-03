@@ -56,13 +56,14 @@ export async function handleCreateSpot(req: Request, url: URL): Promise<Response
     // Prepare data for insertion
     const now = new Date().toISOString();
     const tagsJson = body.tags ? JSON.stringify(body.tags) : null;
+    const screenshotUrlsJson = body.screenshot_urls ? JSON.stringify(body.screenshot_urls) : null;
 
     const insert = db.prepare(`
       INSERT INTO food_spots (
         name, lat, lng, address_text, city, summary,
         my_notes, tags, rating, price,
-        original_share_text, screenshot_r2_key, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        original_share_text, source_url, screenshot_r2_key, screenshot_urls, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = insert.run(
@@ -77,7 +78,9 @@ export async function handleCreateSpot(req: Request, url: URL): Promise<Response
       body.rating || null,
       body.price || null,
       body.original_share_text || null,
+      body.source_url || null,
       body.screenshot_r2_key || null,
+      screenshotUrlsJson,
       now
     );
 
@@ -214,6 +217,18 @@ function validateCreateSpotDto(body: unknown): {
     details.push({ field: 'tags', message: 'Tags must be an array' });
   }
 
+  if (dto.screenshot_urls !== undefined) {
+    if (!Array.isArray(dto.screenshot_urls)) {
+      details.push({ field: 'screenshot_urls', message: 'screenshot_urls must be an array' });
+    } else if (dto.screenshot_urls.some(url => typeof url !== 'string')) {
+      details.push({ field: 'screenshot_urls', message: 'screenshot_urls must be an array of strings' });
+    }
+  }
+
+  if (dto.source_url !== undefined && typeof dto.source_url !== 'string') {
+    details.push({ field: 'source_url', message: 'source_url must be a string' });
+  }
+
   if (dto.summary !== undefined && typeof dto.summary !== 'string') {
     details.push({ field: 'summary', message: 'Summary must be a string' });
   } else if (dto.summary !== undefined && dto.summary.length > 100) {
@@ -245,7 +260,9 @@ type FoodSpot = {
   rating?: number;
   price?: number;
   original_share_text?: string;
+  source_url?: string;
   screenshot_r2_key?: string;
+  screenshot_urls?: string;
   created_at: string;
 };
 
@@ -261,5 +278,7 @@ type CreateSpotDto = {
   rating?: number;
   price?: number;
   original_share_text?: string;
+  source_url?: string;
   screenshot_r2_key?: string;
+  screenshot_urls?: string[];
 };

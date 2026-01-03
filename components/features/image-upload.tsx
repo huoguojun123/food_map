@@ -5,55 +5,65 @@ import React, { useRef, useState } from 'react'
 import { Upload, X } from 'lucide-react'
 
 interface ImageUploadProps {
-  onImageSelect: (file: File) => void
-  onImageUpload?: (file: File) => Promise<void>
+  onImagesSelect: (files: File[]) => void
+  onImagesUpload?: (files: File[]) => Promise<void>
   maxFileSize?: number
   acceptedTypes?: string[]
   className?: string
 }
 
 export default function ImageUpload({
-  onImageSelect,
-  onImageUpload,
+  onImagesSelect,
+  onImagesUpload,
   maxFileSize = 5 * 1024 * 1024,
   acceptedTypes = ['image/jpeg', 'image/png', 'image/webp'],
   className,
 }: ImageUploadProps) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [previewUrls, setPreviewUrls] = useState<string[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleFileSelect = (file: File) => {
-    if (!acceptedTypes.includes(file.type)) {
-      setError(`不支持的文件类型: ${file.type}`)
-      return
+  const handleFileSelect = (files: File[]) => {
+    const validFiles: File[] = []
+    for (const file of files) {
+      if (!acceptedTypes.includes(file.type)) {
+        setError(`不支持的文件类型: ${file.type}`)
+        continue
+      }
+      if (file.size > maxFileSize) {
+        setError('文件太大，最大 5MB')
+        continue
+      }
+      validFiles.push(file)
     }
 
-    if (file.size > maxFileSize) {
-      setError('文件太大，最大 5MB')
+    if (validFiles.length === 0) {
       return
     }
 
     setError(null)
-    setSelectedFile(file)
+    const nextFiles = [...selectedFiles, ...validFiles]
+    setSelectedFiles(nextFiles)
 
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setPreviewUrl(reader.result as string)
-    }
-    reader.readAsDataURL(file)
+    validFiles.forEach(file => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setPreviewUrls(prev => [...prev, reader.result as string])
+      }
+      reader.readAsDataURL(file)
+    })
 
-    onImageSelect(file)
+    onImagesSelect(nextFiles)
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      handleFileSelect(file)
+    const files = Array.from(e.target.files || [])
+    if (files.length > 0) {
+      handleFileSelect(files)
     }
   }
 
@@ -61,9 +71,9 @@ export default function ImageUpload({
     e.preventDefault()
     setIsDragging(false)
 
-    const file = e.dataTransfer.files?.[0]
-    if (file) {
-      handleFileSelect(file)
+    const files = Array.from(e.dataTransfer.files || [])
+    if (files.length > 0) {
+      handleFileSelect(files)
     }
   }
 
@@ -77,7 +87,7 @@ export default function ImageUpload({
   }
 
   const handleUpload = async () => {
-    if (!selectedFile || !onImageUpload) {
+    if (selectedFiles.length === 0 || !onImagesUpload) {
       return
     }
 
@@ -96,7 +106,7 @@ export default function ImageUpload({
         })
       }, 200)
 
-      await onImageUpload(selectedFile)
+      await onImagesUpload(selectedFiles)
 
       clearInterval(progressInterval)
       setUploadProgress(100)
@@ -112,11 +122,15 @@ export default function ImageUpload({
     }
   }
 
-  const handleRemoveImage = () => {
-    setSelectedFile(null)
-    setPreviewUrl(null)
+  const handleRemoveImage = (index: number) => {
+    const nextFiles = selectedFiles.filter((_, idx) => idx !== index)
+    const nextUrls = previewUrls.filter((_, idx) => idx !== index)
+    setSelectedFiles(nextFiles)
+    setPreviewUrls(nextUrls)
     setError(null)
-    if (fileInputRef.current) {
+    onImagesSelect(nextFiles)
+
+    if (fileInputRef.current && nextFiles.length === 0) {
       fileInputRef.current.value = ''
     }
   }
@@ -124,48 +138,51 @@ export default function ImageUpload({
   return (
     <div className={className}>
       <div
-        className={`relative w-full rounded-2xl border-2 border-dashed transition-all duration-200 ${
+        className={`relative w-full rounded-3xl border-2 border-dashed transition-all duration-200 ${
           isDragging
-            ? 'border-orange-500 bg-orange-50 dark:bg-orange-950'
-            : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-400'
+            ? 'border-orange-400 bg-orange-50/80 dark:bg-orange-950/40'
+            : 'border-zinc-200/70 dark:border-zinc-700 hover:border-orange-300'
         }`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {previewUrl ? (
-          <div className="relative w-full">
-            <Image
-              src={previewUrl}
-              alt="Preview"
-              width={800}
-              height={400}
-              unoptimized
-              className="w-full h-64 object-cover rounded-2xl"
-            />
-            {isUploading && (
-              <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center">
-                <div className="bg-white rounded-lg p-4 flex flex-col items-center">
-                  <div className="animate-spin mb-2">
-                    <Upload className="h-8 w-8 text-orange-500" />
-                  </div>
-                  <p className="text-sm font-medium">上传中... {uploadProgress}%</p>
+        {previewUrls.length > 0 ? (
+          <div className="p-4">
+            <div className="grid grid-cols-3 gap-3">
+              {previewUrls.map((url, index) => (
+                <div key={url} className="relative">
+                  <Image
+                    src={url}
+                    alt={`Preview ${index + 1}`}
+                    width={220}
+                    height={220}
+                    unoptimized
+                    className="h-24 w-full object-cover rounded-2xl"
+                  />
+                  {!isUploading && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage(index)}
+                      className="absolute -top-2 -right-2 p-1.5 bg-white shadow-md rounded-full hover:bg-zinc-100 transition-colors"
+                    >
+                      <X className="h-3.5 w-3.5 text-zinc-600" />
+                    </button>
+                  )}
                 </div>
-              </div>
-            )}
-            {!isUploading && (
+              ))}
               <button
                 type="button"
-                onClick={handleRemoveImage}
-                className="absolute top-2 right-2 p-2 bg-white/90 dark:bg-black/70 rounded-full hover:bg-white dark:hover:bg-black/90 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+                className="h-24 rounded-2xl border border-dashed border-zinc-300 text-zinc-400 hover:border-orange-300 hover:text-orange-500 transition-colors"
               >
-                <X className="h-5 w-5 text-zinc-600 dark:text-zinc-300" />
+                +
               </button>
-            )}
+            </div>
           </div>
         ) : (
           <div
-            className="py-12 px-6 flex flex-col items-center justify-center text-center cursor-pointer"
+            className="py-10 px-6 flex flex-col items-center justify-center text-center cursor-pointer"
             onClick={() => fileInputRef.current?.click()}
           >
             {isUploading ? (
@@ -178,17 +195,17 @@ export default function ImageUpload({
             ) : (
               <>
                 <div
-                  className={`mb-4 p-6 rounded-full transition-colors ${
-                    isDragging ? 'bg-orange-100 dark:bg-orange-900' : 'bg-zinc-100 dark:bg-zinc-800'
+                  className={`mb-4 p-5 rounded-full transition-colors ${
+                    isDragging ? 'bg-orange-100' : 'bg-zinc-100'
                   }`}
                 >
-                  <Upload className="h-12 w-12 text-zinc-600 dark:text-zinc-300" />
+                  <Upload className="h-10 w-10 text-zinc-600" />
                 </div>
-                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
+                <p className="text-sm text-zinc-600 mb-2">
                   拖拽图片到此处，或点击选择文件
                 </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-500">
-                  支持 JPEG、PNG、WebP 格式，最大 5MB
+                <p className="text-xs text-zinc-500">
+                  支持 JPEG、PNG、WebP，最大 5MB，可多图
                 </p>
               </>
             )}
@@ -199,12 +216,13 @@ export default function ImageUpload({
           ref={fileInputRef}
           type="file"
           accept={acceptedTypes.join(',')}
+          multiple
           onChange={handleInputChange}
           className="hidden"
         />
 
         {error && (
-          <div className="absolute top-0 left-0 right-0 bg-red-500 text-white px-4 py-2 rounded-t-2xl flex items-center justify-between">
+          <div className="absolute top-0 left-0 right-0 bg-red-500 text-white px-4 py-2 rounded-t-3xl flex items-center justify-between">
             <span className="text-sm">{error}</span>
             <button
               type="button"
@@ -216,12 +234,12 @@ export default function ImageUpload({
           </div>
         )}
 
-        {selectedFile && onImageUpload && (
+        {selectedFiles.length > 0 && onImagesUpload && (
           <button
             type="button"
             onClick={handleUpload}
             disabled={isUploading}
-            className="absolute bottom-3 right-3 px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 disabled:opacity-60"
+            className="absolute bottom-3 right-3 px-4 py-2 rounded-xl bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 disabled:opacity-60"
           >
             上传到云端
           </button>

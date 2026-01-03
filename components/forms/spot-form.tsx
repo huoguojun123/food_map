@@ -77,6 +77,14 @@ export default function SpotForm({
     setFormData({ ...formData, tags: newTags })
   }
 
+  const handleRemoveImage = (index: number) => {
+    if (!formData.screenshot_urls) {
+      return
+    }
+    const nextUrls = formData.screenshot_urls.filter((_, idx) => idx !== index)
+    setFormData({ ...formData, screenshot_urls: nextUrls })
+  }
+
   const presetTags = ['火锅', '烧烤', '日料', '聚会', '情侣约会', '家庭聚餐', '工作午餐']
 
   return (
@@ -208,6 +216,47 @@ export default function SpotForm({
               disabled={isSaving}
             />
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+              来源链接
+            </label>
+            <input
+              type="url"
+              value={formData.source_url || ''}
+              onChange={e => setFormData({ ...formData, source_url: e.target.value })}
+              className="w-full px-4 py-3 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              placeholder="例如：https://..."
+              disabled={isSaving}
+            />
+          </div>
+
+          {formData.screenshot_urls && formData.screenshot_urls.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                已上传图片
+              </label>
+              <div className="grid grid-cols-3 gap-3">
+                {formData.screenshot_urls.map((url, index) => (
+                  <div key={`${url}-${index}`} className="relative group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt={`Spot ${index + 1}`}
+                      className="h-20 w-full object-cover rounded-xl border border-zinc-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage(index)}
+                      className="absolute -top-2 -right-2 px-2 py-1 rounded-full bg-white text-xs text-zinc-600 shadow hover:bg-zinc-100"
+                    >
+                      移除
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">

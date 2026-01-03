@@ -13,6 +13,8 @@ export interface FoodSpot {
   price?: number
   original_share_text?: string
   screenshot_r2_key?: string
+  screenshot_urls?: string // JSON Array string: ["https://..."]
+  source_url?: string
   created_at: string
 }
 
@@ -43,6 +45,8 @@ export interface CreateSpotDto {
   price?: number
   original_share_text?: string
   screenshot_r2_key?: string
+  screenshot_urls?: string[]
+  source_url?: string
 }
 
 export type UpdateSpotDto = Partial<CreateSpotDto>
