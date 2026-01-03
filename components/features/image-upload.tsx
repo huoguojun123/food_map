@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import React, { useRef, useState } from 'react'
 import { Upload, X } from 'lucide-react'
 
@@ -136,9 +137,12 @@ export default function ImageUpload({
     >
       {previewUrl ? (
         <div className="relative w-full">
-          <img
+          <Image
             src={previewUrl}
             alt="Preview"
+            width={800}
+            height={400}
+            unoptimized
             className="w-full h-64 object-cover rounded-2xl"
           />
           {isUploading && (

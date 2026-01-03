@@ -90,11 +90,3 @@ export async function uploadImageToR2(
   };
 }
 
-export default {
-  extractSpotInfo,
-  createSpot,
-  listSpots,
-  getSpot,
-  geocodeAddress,
-  uploadImageToR2,
-};

@@ -45,7 +45,7 @@ export interface CreateSpotDto {
   screenshot_r2_key?: string
 }
 
-export interface UpdateSpotDto extends Partial<CreateSpotDto> {}
+export type UpdateSpotDto = Partial<CreateSpotDto>
 
 export interface CreateCollectionDto {
   title: string

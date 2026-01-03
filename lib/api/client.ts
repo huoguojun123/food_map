@@ -1,8 +1,6 @@
 // API client base class
 // Provides typed HTTP methods with error handling and retry logic
 
-import type { FoodSpot, CreateSpotDto, AiExtractionResult } from '../types';
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
 const MAX_RETRIES = 2;
 
