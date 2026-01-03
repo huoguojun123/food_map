@@ -29,6 +29,8 @@ body {
 
 .page-shell {
   padding-bottom: calc(var(--omnibar-height, 240px) + env(safe-area-inset-bottom));
+  transition: padding-bottom 0.25s ease;
+  will-change: padding-bottom;
 }
 
 .image-frame {

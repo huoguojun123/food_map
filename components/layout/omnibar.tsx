@@ -209,7 +209,7 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
             <button
               type="button"
               onClick={() => setIsExpanded(prev => !prev)}
-              className="flex w-full items-center justify-between text-left lg:hidden"
+              className="flex w-full items-center justify-between text-left"
             >
               <div>
                 <p className="text-sm font-medium text-zinc-800">录入美食记录</p>
@@ -220,8 +220,15 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
               />
             </button>
 
-            <div className={`${isExpanded ? 'mt-4' : 'mt-0 hidden'} lg:block`}>
-              <div className="grid gap-4 lg:grid-cols-[240px_1fr_auto]">
+            <div
+              className="overflow-hidden transition-all duration-300 ease-out"
+              style={{
+                maxHeight: isExpanded ? '1000px' : '0px',
+                opacity: isExpanded ? 1 : 0,
+                transform: isExpanded ? 'translateY(0px)' : 'translateY(8px)',
+              }}
+            >
+              <div className="mt-4 grid gap-4 lg:grid-cols-[240px_1fr_auto]">
                 <ImageUpload
                   onImagesSelect={handleImagesSelect}
                   onImagesUpload={handleImagesUpload}

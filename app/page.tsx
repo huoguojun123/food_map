@@ -229,18 +229,19 @@ export default function HomePage() {
               <div className="flex-1 h-px bg-gradient-to-r from-orange-200 to-transparent" />
             </div>
 
-            {spots.map((spot, index) => {
-              const images = getImageUrls(spot)
+            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              {spots.map((spot, index) => {
+                const images = getImageUrls(spot)
 
-              return (
-                <div
-                  key={spot.id}
-                  className="mag-card rounded-[32px] p-6 md:p-8 space-y-6"
-                  style={{
-                    animation: `fadeInUp 0.6s ease-out ${index * 0.08}s both`,
-                  }}
-                >
-                  <div className="grid gap-6 lg:grid-cols-[1.1fr_1.4fr]">
+                return (
+                  <div
+                    key={spot.id}
+                    className="mag-card rounded-[32px] p-6 space-y-6"
+                    style={{
+                      animation: `fadeInUp 0.6s ease-out ${index * 0.08}s both`,
+                    }}
+                  >
+                  <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
                     {images.length > 0 ? (
                       <div className="space-y-3">
                         <div className="overflow-hidden rounded-2xl border border-orange-100 image-frame">
@@ -263,9 +264,9 @@ export default function HomePage() {
                                 />
                               </div>
                             ))}
-                          </div>
-                        )}
                       </div>
+                    )}
+                  </div>
                     ) : (
                       <div className="mag-chip rounded-2xl p-6 text-sm text-zinc-500">
                         暂无图片，添加截图可丰富记录
@@ -354,9 +355,10 @@ export default function HomePage() {
                       })}
                     </span>
                   </div>
-                </div>
-              )
-            })}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
       </main>
