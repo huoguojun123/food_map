@@ -32,8 +32,8 @@ export interface SystemConfig {
 // API types
 export interface CreateSpotDto {
   name: string
-  lat: number
-  lng: number
+  lat?: number
+  lng?: number
   address_text?: string
   city?: string
   summary?: string

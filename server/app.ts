@@ -6,6 +6,7 @@ import { handleCreateSpot, handleListSpots, handleGetSpot } from './api/spots.js
 import { handleAiExtract } from './api/ai.js';
 import { handleGeocode } from './api/geocode.js';
 import { handleUpload } from './api/upload.js';
+import { handleSettings } from './api/settings.js';
 
 // Route handler type
 type RouteHandler = (req: Request, url: URL) => Response | Promise<Response>;
@@ -47,6 +48,13 @@ registerRoute('/api/ai/geocode', async (req, url) => {
 registerRoute('/api/upload/r2', async (req, url) => {
   if (req.method === 'POST') {
     return handleUpload(req);
+  }
+  return Response.json({ error: 'Method not allowed' }, { status: 405 });
+});
+
+registerRoute('/api/settings', async (req, url) => {
+  if (req.method === 'POST') {
+    return handleSettings(req);
   }
   return Response.json({ error: 'Method not allowed' }, { status: 405 });
 });
@@ -133,7 +141,10 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     // Match route
     for (const [route, handler] of routes.entries()) {
-      if (pathname.startsWith(route)) {
+      const isPrefix = route.endsWith('/');
+      const isMatch = isPrefix ? pathname.startsWith(route) : pathname === route;
+
+      if (isMatch) {
         const response = await handler(req, url);
         return withCors(response);
       }

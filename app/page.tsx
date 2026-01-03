@@ -1,59 +1,66 @@
-'use client';
+'use client'
 
-import React, { useState, useEffect } from 'react';
-import type { CreateSpotDto, FoodSpot } from '@/lib/types/index';
-import { listSpots, createSpot } from '@/lib/api/spots';
-import Omnibar from '@/components/layout/omnibar';
-import { Plus, Sparkles, Clock, MapPin, Star } from 'lucide-react';
+import React, { useEffect, useState } from 'react'
+import type { CreateSpotDto, FoodSpot } from '@/lib/types/index'
+import { createSpot, listSpots } from '@/lib/api/spots'
+import Omnibar from '@/components/layout/omnibar'
+import { Clock, MapPin, Plus, Sparkles, Star } from 'lucide-react'
 
 export default function HomePage() {
-  const [spots, setSpots] = useState<FoodSpot[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [spots, setSpots] = useState<FoodSpot[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Load spots on mount
   useEffect(() => {
-    loadSpots();
-    registerServiceWorker();
-  }, []);
+    loadSpots()
+  }, [])
+
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(err => {
+        console.error('Service Worker registration failed:', err)
+      })
+    }
+  }, [])
 
   const loadSpots = async () => {
-    setIsLoading(true);
-    setError(null);
+    setIsLoading(true)
+    setError(null)
 
     try {
-      const data = await listSpots();
-      setSpots(data);
+      const data = await listSpots()
+      setSpots(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '加载失败');
+      setError(err instanceof Error ? err.message : '加载失败')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const handleSpotCreate = async (data: CreateSpotDto) => {
     try {
-      const newSpot = await createSpot(data);
-      setSpots(prev => [newSpot, ...prev]);
+      const newSpot = await createSpot(data)
+      setSpots(prev => [newSpot, ...prev])
     } catch (err) {
-      throw err;
+      throw err
     }
-  };
+  }
 
-  const registerServiceWorker = async () => {
-    if ('serviceWorker' in navigator) {
-      try {
-        await navigator.serviceWorker.register('/sw.js');
-        console.log('✅ Service Worker registered');
-      } catch (err) {
-        console.error('Service Worker registration failed:', err);
-      }
+  const getTagList = (tags?: string): string[] => {
+    if (!tags) {
+      return []
     }
-  };
+
+    try {
+      const parsed = JSON.parse(tags)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
 
   return (
     <div className="min-h-screen pb-32">
-      {/* Header - 更优美的渐变设计 */}
       <header className="border-b border-zinc-200/50 dark:border-zinc-800/50 backdrop-blur-md bg-white/50 dark:bg-zinc-950/50 sticky top-0 z-40">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -70,12 +77,17 @@ export default function HomePage() {
               <div className="text-xs text-zinc-400 dark:text-zinc-600 bg-zinc-100 dark:bg-zinc-800 px-3 py-1.5 rounded-full">
                 {spots.length} 个记录
               </div>
+              <a
+                href="/settings"
+                className="text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+              >
+                设置
+              </a>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content - 优化后的卡片设计 */}
       <main className="max-w-4xl mx-auto px-4 py-8">
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
@@ -128,7 +140,6 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Timeline indicator */}
             <div className="flex items-center gap-3 mb-6 px-2">
               <Clock className="h-5 w-5 text-orange-500" />
               <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
@@ -137,7 +148,6 @@ export default function HomePage() {
               <div className="flex-1 h-px bg-gradient-to-r from-zinc-200 to-transparent dark:from-zinc-700" />
             </div>
 
-            {/* Spot Cards - 优化后的设计 */}
             {spots.map((spot, index) => (
               <div
                 key={spot.id}
@@ -146,10 +156,8 @@ export default function HomePage() {
                   animation: `fadeInUp 0.5s ease-out ${index * 0.1}s both`,
                 }}
               >
-                {/* Background decoration */}
                 <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-orange-500/5 to-transparent rounded-bl-full group-hover:from-orange-500/10 transition-colors" />
 
-                {/* Spot Header */}
                 <div className="flex items-start justify-between gap-4 relative z-10">
                   <div className="flex-1">
                     <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-1 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
@@ -162,7 +170,7 @@ export default function HomePage() {
                       </span>
                     )}
                   </div>
-                  {spot.rating && (
+                  {spot.rating !== undefined && spot.rating !== null && (
                     <div className="flex items-center gap-1.5 bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30 px-4 py-2 rounded-2xl">
                       <Star className="h-4 w-4 text-orange-600 dark:text-orange-400 fill-orange-600 dark:fill-orange-400" />
                       <span className="text-sm font-bold text-orange-700 dark:text-orange-300">
@@ -172,7 +180,6 @@ export default function HomePage() {
                   )}
                 </div>
 
-                {/* AI Summary - 更突出的设计 */}
                 {spot.summary && (
                   <div className="my-4">
                     <div className="inline-flex items-start gap-2 bg-gradient-to-r from-zinc-50 to-orange-50 dark:from-zinc-800/50 dark:to-orange-900/20 rounded-2xl px-4 py-3">
@@ -184,7 +191,6 @@ export default function HomePage() {
                   </div>
                 )}
 
-                {/* Spot Details */}
                 <div className="space-y-3 relative z-10">
                   {spot.address_text && (
                     <div className="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-400">
@@ -193,7 +199,7 @@ export default function HomePage() {
                     </div>
                   )}
 
-                  {spot.price && (
+                  {spot.price !== undefined && spot.price !== null && (
                     <div className="flex items-center gap-2 text-sm">
                       <span className="text-orange-600 dark:text-orange-400 font-bold">¥</span>
                       <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-lg">
@@ -205,7 +211,7 @@ export default function HomePage() {
 
                   {spot.tags && (
                     <div className="flex flex-wrap gap-2">
-                      {JSON.parse(spot.tags).map((tag: string, idx: number) => (
+                      {getTagList(spot.tags).map((tag: string, idx: number) => (
                         <span
                           key={idx}
                           className="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-zinc-100 to-zinc-50 dark:from-zinc-800 dark:to-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl border border-zinc-200 dark:border-zinc-700"
@@ -226,7 +232,6 @@ export default function HomePage() {
                   )}
                 </div>
 
-                {/* Timestamp - 更优雅的设计 */}
                 <div className="flex items-center gap-2 mt-5 pt-4 border-t border-zinc-200 dark:border-zinc-700 relative z-10">
                   <Clock className="h-3.5 w-3.5 text-zinc-400" />
                   <span className="text-xs text-zinc-500 dark:text-zinc-500 font-medium">
@@ -245,8 +250,7 @@ export default function HomePage() {
         )}
       </main>
 
-      {/* Omnibar - Bottom Input Bar */}
-      <Omnibar onSpotCreate={handleSpotCreate} existingSpots={spots} />
+      <Omnibar onSpotCreate={handleSpotCreate} />
 
       <style jsx>{`
         @keyframes fadeInUp {
@@ -261,5 +265,5 @@ export default function HomePage() {
         }
       `}</style>
     </div>
-  );
+  )
 }

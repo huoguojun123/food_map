@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS food_spots (
   city TEXT,
 
   -- Content
-  summary TEXT, -- AI generated <20 chars. e.g. "牛油重辣，排队两小时"
+  summary TEXT, -- AI generated <20 chars
   my_notes TEXT, -- Optional user manual notes
   tags TEXT, -- JSON Array: ["Hot", "Date Night"]
   rating REAL,
@@ -51,6 +51,6 @@ export const insertSampleData = `
 -- Sample spot for testing
 INSERT INTO food_spots (name, lat, lng, address_text, city, summary, tags, rating, price)
 VALUES
-  ('示例餐厅', 39.9042, 116.4074, '北京市东城区王府井大街88号', '北京', '不错的火锅店', '["火锅", "聚会"]', 4.5, 150)
+  ('示例餐厅', 39.9042, 116.4074, '北京市东城区王府井大街8号', '北京', '排队两小时的火锅店', '["火锅", "聚会"]', 4.5, 150)
 ON CONFLICT DO NOTHING;
 `;

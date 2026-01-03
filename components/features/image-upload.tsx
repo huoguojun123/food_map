@@ -1,129 +1,130 @@
-'use client';
+'use client'
 
-import React, { useState, useRef } from 'react';
-import { uploadImageToR2 } from '@/lib/api/spots';
-import { Upload, X, Image as ImageIcon } from 'lucide-react';
+import React, { useRef, useState } from 'react'
+import { Upload, X } from 'lucide-react'
 
 interface ImageUploadProps {
-  onImageSelect: (file: File) => void;
-  onImageUpload?: (r2Key: string) => Promise<void>;
-  maxFileSize?: number; // 默认 5MB
-  acceptedTypes?: string[]; // 默认 ['image/jpeg', 'image/png', 'image/webp']
+  onImageSelect: (file: File) => void
+  onImageUpload?: (file: File) => Promise<void>
+  maxFileSize?: number
+  acceptedTypes?: string[]
+  className?: string
 }
 
 export default function ImageUpload({
   onImageSelect,
   onImageUpload,
-  maxFileSize = 5 * 1024 * 1024, // 5MB
+  maxFileSize = 5 * 1024 * 1024,
   acceptedTypes = ['image/jpeg', 'image/png', 'image/webp'],
+  className,
 }: ImageUploadProps) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileSelect = (file: File) => {
-    // Validate file type
     if (!acceptedTypes.includes(file.type)) {
-      setError(`不支持的文件类型: ${file.type}`);
-      return;
+      setError(`不支持的文件类型: ${file.type}`)
+      return
     }
 
-    // Validate file size
     if (file.size > maxFileSize) {
-      setError('文件太大，最大 5MB');
-      return;
+      setError('文件太大，最大 5MB')
+      return
     }
 
-    setError(null);
-    setSelectedFile(file);
+    setError(null)
+    setSelectedFile(file)
 
-    // Create preview
-    const reader = new FileReader();
+    const reader = new FileReader()
     reader.onloadend = () => {
-      setPreviewUrl(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+      setPreviewUrl(reader.result as string)
+    }
+    reader.readAsDataURL(file)
 
-    onImageSelect(file);
-  };
+    onImageSelect(file)
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const file = e.target.files?.[0]
     if (file) {
-      handleFileSelect(file);
+      handleFileSelect(file)
     }
-  };
+  }
 
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
+    e.preventDefault()
+    setIsDragging(false)
 
-    const file = e.dataTransfer.files?.[0];
+    const file = e.dataTransfer.files?.[0]
     if (file) {
-      handleFileSelect(file);
+      handleFileSelect(file)
     }
-  };
+  }
 
   const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
+    e.preventDefault()
+    setIsDragging(true)
+  }
 
   const handleDragLeave = () => {
-    setIsDragging(false);
-  };
+    setIsDragging(false)
+  }
 
   const handleUpload = async () => {
-    if (!selectedFile || !onImageUpload) return;
+    if (!selectedFile || !onImageUpload) {
+      return
+    }
 
-    setIsUploading(true);
-    setError(null);
-    setUploadProgress(0);
+    setIsUploading(true)
+    setError(null)
+    setUploadProgress(0)
 
     try {
-      // Simulate progress (real implementation would use XHR with progress events)
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
           if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 100;
+            clearInterval(progressInterval)
+            return 100
           }
-          return prev + 10;
-        });
-      }, 200);
+          return prev + 10
+        })
+      }, 200)
 
-      const result = await onImageUpload(selectedFile);
+      await onImageUpload(selectedFile)
 
-      clearInterval(progressInterval);
-      setUploadProgress(100);
+      clearInterval(progressInterval)
+      setUploadProgress(100)
 
-      // Delay to show 100% before clearing
       setTimeout(() => {
-        setIsUploading(false);
-        setUploadProgress(0);
-      }, 500);
+        setIsUploading(false)
+        setUploadProgress(0)
+      }, 500)
     } catch (err) {
-      setIsUploading(false);
-      setUploadProgress(0);
-      setError(err instanceof Error ? err.message : '上传失败');
+      setIsUploading(false)
+      setUploadProgress(0)
+      setError(err instanceof Error ? err.message : '上传失败')
     }
-  };
+  }
 
   const handleRemoveImage = () => {
-    setSelectedFile(null);
-    setPreviewUrl(null);
-    setError(null);
+    setSelectedFile(null)
+    setPreviewUrl(null)
+    setError(null)
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = ''
     }
-  };
+  }
 
   return (
     <div
+      className={className}
+    >
+      <div
       className={`relative w-full rounded-2xl border-2 border-dashed transition-all duration-200 ${
         isDragging
           ? 'border-orange-500 bg-orange-50 dark:bg-orange-950'
@@ -134,7 +135,6 @@ export default function ImageUpload({
       onDrop={handleDrop}
     >
       {previewUrl ? (
-        // Preview mode
         <div className="relative w-full">
           <img
             src={previewUrl}
@@ -162,7 +162,6 @@ export default function ImageUpload({
           )}
         </div>
       ) : (
-        // Upload mode
         <div
           className="py-12 px-6 flex flex-col items-center justify-center text-center cursor-pointer"
           onClick={() => fileInputRef.current?.click()}
@@ -214,6 +213,18 @@ export default function ImageUpload({
           </button>
         </div>
       )}
+
+      {selectedFile && onImageUpload && (
+        <button
+          type="button"
+          onClick={handleUpload}
+          disabled={isUploading}
+          className="absolute bottom-3 right-3 px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 disabled:opacity-60"
+        >
+          上传到云端
+        </button>
+      )}
+      </div>
     </div>
-  );
+  )
 }

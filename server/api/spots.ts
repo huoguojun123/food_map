@@ -27,7 +27,10 @@ export async function handleCreateSpot(req: Request, url: URL): Promise<Response
     let lat = body.lat;
     let lng = body.lng;
 
-    if (!lat || !lng) {
+    const hasLat = typeof lat === 'number' && Number.isFinite(lat);
+    const hasLng = typeof lng === 'number' && Number.isFinite(lng);
+
+    if (!hasLat || !hasLng) {
       if (body.address_text) {
         try {
           const geocodeResult = await geocode(body.address_text, body.city);
@@ -165,18 +168,30 @@ function validateCreateSpotDto(body: unknown): {
     details.push({ field: 'name', message: 'Name must be less than 200 characters' });
   }
 
-  // Required: lat
-  if (dto.lat === undefined || typeof dto.lat !== 'number') {
-    details.push({ field: 'lat', message: 'Latitude is required and must be a number' });
-  } else if (dto.lat < -90 || dto.lat > 90) {
-    details.push({ field: 'lat', message: 'Latitude must be between -90 and 90' });
+  const hasLat = typeof dto.lat === 'number' && Number.isFinite(dto.lat);
+  const hasLng = typeof dto.lng === 'number' && Number.isFinite(dto.lng);
+
+  if (hasLat !== hasLng) {
+    details.push({ field: 'lat', message: 'Latitude and longitude must be provided together' });
+    details.push({ field: 'lng', message: 'Latitude and longitude must be provided together' });
   }
 
-  // Required: lng
-  if (dto.lng === undefined || typeof dto.lng !== 'number') {
-    details.push({ field: 'lng', message: 'Longitude is required and must be a number' });
-  } else if (dto.lng < -180 || dto.lng > 180) {
-    details.push({ field: 'lng', message: 'Longitude must be between -180 and 180' });
+  if (hasLat) {
+    if (dto.lat < -90 || dto.lat > 90) {
+      details.push({ field: 'lat', message: 'Latitude must be between -90 and 90' });
+    }
+  }
+
+  if (hasLng) {
+    if (dto.lng < -180 || dto.lng > 180) {
+      details.push({ field: 'lng', message: 'Longitude must be between -180 and 180' });
+    }
+  }
+
+  if (!hasLat && !hasLng) {
+    if (!dto.address_text || typeof dto.address_text !== 'string') {
+      details.push({ field: 'address_text', message: 'Address is required when coordinates are missing' });
+    }
   }
 
   // Optional fields validation

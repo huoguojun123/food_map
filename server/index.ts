@@ -17,10 +17,24 @@ if (fs.existsSync(envPath)) {
   const envLines = envContent.split('\n');
 
   for (const line of envLines) {
-    const match = line.match(/^([^=]+)=(.*)$/);
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+
+    const match = trimmed.match(/^([^=]+)=(.*)$/);
     if (match) {
-      const [key, value] = match;
-      process.env[key.trim()] = value.trim();
+      const key = match[1].trim();
+      let value = match[2].trim();
+
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+
+      process.env[key] = value;
     }
   }
   console.log(`✅ Loaded environment from ${envPath}`);

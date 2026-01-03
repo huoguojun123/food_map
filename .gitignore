@@ -65,6 +65,7 @@ Thumbs.db
 *.db
 *.sqlite
 *.sqlite3
+data/
 
 # User uploads (if testing locally)
 public/uploads/
