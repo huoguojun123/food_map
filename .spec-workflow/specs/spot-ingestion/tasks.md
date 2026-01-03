@@ -2,7 +2,7 @@
 
 ## Overview
 
-将餐厅录入功能分解为可执行的开发任务，按照从后端到前端的顺序实现。
+将餐厅录入功能分解为 15 个可执行的开发任务，按照从后端到前端的顺序实现。
 
 ---
 
@@ -27,7 +27,7 @@ Task: Create database connection module for SQLite using better-sqlite3, initial
 Restrictions:
 - Use better-sqlite3 for Bun compatibility
 - Do not use ORMs, stick to raw SQL queries
-- Follow the existing schema from lib/db/schema.ts
+- Follows existing schema from lib/db/schema.ts
 _Leverage:
 - lib/db/schema.ts for table creation SQL
 - lib/types/index.ts for TypeScript interfaces
@@ -171,6 +171,7 @@ Restrictions:
 - Support graceful degradation when R2 is not available
 _Leverage:
 - server/index.ts for environment variables
+- lib/types/index.ts for types
 _Requirements: 1.6, 技术指导
 Success:
 - server/services/r2.ts created with uploadImage function
@@ -228,7 +229,7 @@ Success:
 
 **_Leverage**: `server/services/openai.ts` (Task 3)
 
-**_Requirements**: 1.1, 1.2, 5.1
+**_Requirements**: 1.1, 1.2, 技术指导文档中的 AI 配置
 
 **Description**:
 - 实现 POST /api/ai/extract 端点
@@ -246,7 +247,7 @@ Restrictions:
 _Leverage:
 - server/services/openai.ts for AI API calls
 - lib/types/index.ts for AiExtractionResult interface
-_Requirements: 1.1, 1.2, 5.1
+_Requirements: 1.1, 1.2, 技术指导
 Success:
 - POST /api/ai/extract endpoint implemented
 - Accepts {type: 'image'|'text', image?, text?} in request body
@@ -264,7 +265,7 @@ Success:
 
 **_Leverage**: `server/services/amap.ts` (Task 4)
 
-**_Requirements**: 1.3, 5.1
+**_Requirements**: 1.3, 5.1, 技术指导文档中的地图 API 配置
 
 **Description**:
 - 实现 POST /api/ai/geocode 端点
@@ -282,11 +283,11 @@ Restrictions:
 _Leverage:
 - server/services/amap.ts for geocoding
 - lib/types/index.ts for GeocodingResult interface
-_Requirements: 1.3, 5.1
+_Requirements: 1.3, 5.1, 技术指导
 Success:
 - POST /api/ai/geocode endpoint implemented
 - Accepts {address, city?} in request body
-- Returns {success, data, error} response with {lat, lng} coordinates
+- Returns {success, data, error} response with {lat, lng}
 - Timeout after 5 seconds
 
 ---
@@ -299,7 +300,7 @@ Success:
 
 **_Leverage**: `server/services/r2.ts` (Task 5)
 
-**_Requirements**: 1.6, 技术指导中的图片上传要求
+**_Requirements**: 1.6, 技术指导文档中的图片上传要求
 
 **Description**:
 - 实现 POST /api/upload/r2 端点
@@ -322,7 +323,7 @@ Success:
 - POST /api/upload/r2 endpoint implemented
 - Accepts file upload via multipart/form-data
 - Validates file type and size
-- Returns {success, data} with {key, url}
+- Returns {success, data} response with {key, url}
 - 5MB size limit enforced
 
 ---
@@ -406,7 +407,7 @@ Success:
 
 **_Leverage**: `lib/api/client.ts` (Task 11), Tailwind CSS 样式
 
-**_Requirements**: 2.1, 4.3, 5.2
+**_Requirements**: 2.1, 4.3, 5.2, 技术指导文档中的组件规范
 
 **Description**:
 - 创建图片上传组件
@@ -425,7 +426,7 @@ Restrictions:
 _Leverage:
 - lib/api/spots.ts for uploadImageToR2
 - Tailwind CSS classes from structure.md
-_Requirements: 2.1, 4.3, 5.2
+_Requirements: 2.1, 4.3, 5.2, 技术指导
 Success:
 - components/features/image-upload.tsx created
 - Supports file selection via click and drag-and-drop
@@ -444,7 +445,7 @@ Success:
 
 **_Leverage**: `lib/api/client.ts` (Task 11), `lib/types/index.ts` (类型定义)
 
-**_Requirements**: 2.4, 4.2, 5.1
+**_Requirements**: 2.4, 4.3, 5.1, 技术指导文档中的表单组件规范
 
 **Description**:
 - 创建餐厅编辑/确认表单组件
@@ -455,7 +456,7 @@ Success:
 
 **_Prompt**: Implement the task for spec spot-ingestion, first run spec-workflow-guide to get the workflow guide then implement the task:
 Role: React Developer specializing in form components
-Task: Create SpotForm component that displays extracted restaurant data from AI, allows manual editing, validates required fields (name, lat, lng), and calls createSpot API from Task 11
+Task: Create SpotForm component that displays extracted restaurant data from AI, allows manual editing of all fields, validates required fields (name, lat, lng), and calls createSpot API from Task 11
 Restrictions:
 - Use 'use client' directive
 - Validate required fields on client-side
@@ -463,7 +464,7 @@ Restrictions:
 _Leverage:
 - lib/api/spots.ts for createSpot
 - lib/types/index.ts for CreateSpotDto, FoodSpot interfaces
-_Requirements: 2.4, 5.1
+_Requirements: 2.4, 4.3, 5.1, 技术指导
 Success:
 - components/forms/spot-form.tsx created
 - Displays all form fields (name, address, city, summary, notes, tags, rating, price)
@@ -482,7 +483,7 @@ Success:
 
 **_Leverage**: `ImageUpload` (Task 12), `SpotForm` (Task 13), `lib/api/ai.ts` (Task 11)
 
-**_Requirements**: 1.1, 1.2, 2.1, 5.1
+**_Requirements**: 1.1, 1.2, 2.1, 5.1, 技术指导文档中的输入栏规范
 
 **Description**:
 - 创建全能输入栏组件
@@ -493,7 +494,7 @@ Success:
 
 **_Prompt**: Implement the task for spec spot-ingestion, first run spec-workflow-guide to get the workflow guide then implement the task:
 Role: React Developer specializing in layout components
-Task: Create Omnibar component that integrates ImageUpload (Task 12) and SpotForm (Task 13), automatically detects input type (image vs text), calls appropriate AI extraction API, manages loading and error states
+Task: Create Omnibar component that integrates ImageUpload (Task 12) and SpotForm (Task 13), automatically detects input type (image vs text), calls appropriate AI extraction API, and manages loading and error states
 Restrictions:
 - Use 'use client' directive
 - Follow mobile-first design principles
@@ -502,7 +503,7 @@ _Leverage:
 - ImageUpload component from Task 12
 - SpotForm component from Task 13
 - lib/api/spots.ts for extractSpotInfo
-_Requirements: 1.1, 1.2, 2.1, 5.1
+_Requirements: 1.1, 1.2, 2.1, 5.1, 技术指导
 Success:
 - components/layout/omnibar.tsx created
 - Integrates ImageUpload and SpotForm components
@@ -519,7 +520,7 @@ Success:
 
 **Status**: [ ] Pending
 
-**_Leverage**: `Omnibar` (Task 14), `app/layout.tsx` (现有布局)
+**_Leverage**: `Omnibar` (Task 14), `app/layout.tsx` (现有布局), `lib/api/client.ts` (Task 11)
 
 **_Requirements**: 技术指导文档中的 UI 集成
 
@@ -551,7 +552,7 @@ Success:
 
 ## Implementation Notes
 
-### Task 顺序
+### 任务顺序
 
 1. **Backend First** (Tasks 1-9): 先完成后端基础设施和服务
 2. **API Client** (Task 10-11): 然后创建前端 API 客户端
@@ -569,3 +570,7 @@ Success:
 - 代码行数（新增/删除）
 - 详细的实现描述
 - artifacts（API 端点、组件、函数等）
+
+---
+**Status**: ✅ Approved
+**Approved At**: 2026-01-03T03:00:00Z
