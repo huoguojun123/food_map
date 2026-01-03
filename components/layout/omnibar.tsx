@@ -14,6 +14,7 @@ interface OmnibarProps {
 export default function Omnibar({ onSpotCreate }: OmnibarProps) {
   const [inputText, setInputText] = useState('')
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
+  const [uploadedImageKey, setUploadedImageKey] = useState<string | null>(null)
   const [isExtracting, setIsExtracting] = useState(false)
   const [previewSpot, setPreviewSpot] = useState<CreateSpotDto | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -34,12 +35,14 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
 
   const handleImageSelect = async (file: File) => {
     setSelectedImage(file)
+    setUploadedImageKey(null)
     await extractFromImage(file)
   }
 
   const handleImageUpload = async (file: File) => {
     try {
       const result = await uploadImageToR2(file)
+      setUploadedImageKey(result.key)
       if (previewSpot) {
         setPreviewSpot({ ...previewSpot, screenshot_r2_key: result.key })
       }
@@ -57,6 +60,8 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
       createPreviewSpot(result, text)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'AI 识别失败，请手动输入')
+      createFallbackSpot(text)
+    } finally {
       setIsExtracting(false)
     }
   }
@@ -77,18 +82,16 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
       })
 
       const result = await extractSpotInfo({ type: 'image', image: base64 })
-      createPreviewSpot(result, undefined, file.name)
+      createPreviewSpot(result)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'AI 识别失败，请手动输入')
+      createFallbackSpot()
+    } finally {
       setIsExtracting(false)
     }
   }
 
-  const createPreviewSpot = (
-    result: AiExtractionResult,
-    originalText?: string,
-    imageName?: string
-  ) => {
+  const createPreviewSpot = (result: AiExtractionResult, originalText?: string) => {
     const spot: CreateSpotDto = {
       name: result.name,
       summary: result.summary,
@@ -97,13 +100,30 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
       rating: result.rating,
       tags: result.dishes || [],
       original_share_text: originalText,
-      screenshot_r2_key: imageName,
+      screenshot_r2_key: uploadedImageKey ?? undefined,
       lat: undefined,
       lng: undefined,
     }
 
     setPreviewSpot(spot)
-    setIsExtracting(false)
+    setShowForm(true)
+  }
+
+  const createFallbackSpot = (originalText?: string) => {
+    const spot: CreateSpotDto = {
+      name: '',
+      summary: undefined,
+      address_text: undefined,
+      price: undefined,
+      rating: undefined,
+      tags: [],
+      original_share_text: originalText,
+      screenshot_r2_key: uploadedImageKey ?? undefined,
+      lat: undefined,
+      lng: undefined,
+    }
+
+    setPreviewSpot(spot)
     setShowForm(true)
   }
 
@@ -119,6 +139,7 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
   const resetOmnibar = () => {
     setInputText('')
     setSelectedImage(null)
+    setUploadedImageKey(null)
     setPreviewSpot(null)
     setError(null)
     setIsExtracting(false)
