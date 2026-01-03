@@ -8,12 +8,13 @@
   --paper-muted: #6d6357;
   --accent: #d97b36;
   --accent-deep: #b45a24;
+  --ring: rgba(217, 123, 54, 0.35);
 }
 
 body {
   font-family: var(--font-body, "Noto Sans SC", sans-serif);
   color: var(--paper-ink);
-  background: radial-gradient(circle at top, #fbf7f0 0%, #f3ede3 45%, #eee6d9 100%);
+  background: radial-gradient(circle at top, #fff8ef 0%, #f6efe3 50%, #efe6d7 100%);
   position: relative;
   min-height: 100vh;
 }
@@ -52,6 +53,18 @@ body::after {
 .mag-chip {
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(215, 190, 160, 0.6);
+}
+
+.mag-shell {
+  background: linear-gradient(180deg, rgba(255, 250, 242, 0.9), rgba(255, 250, 242, 0.6));
+  border: 1px solid rgba(236, 210, 190, 0.6);
+  box-shadow: 0 24px 60px rgba(53, 32, 16, 0.12);
+}
+
+.mag-input {
+  border: 1px solid rgba(236, 210, 190, 0.9);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
 }
 
 @keyframes fadeInUp {

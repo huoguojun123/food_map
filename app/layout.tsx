@@ -20,12 +20,15 @@ export const metadata: Metadata = {
   title: 'GourmetLog - 私人美食外脑',
   description: '只记位置，不看地图；全靠 AI，决策食物。',
   manifest: '/manifest.json',
-  themeColor: '#f97316',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
     title: 'GourmetLog',
   },
+}
+
+export const viewport = {
+  themeColor: '#f97316',
 }
 
 export default function RootLayout({

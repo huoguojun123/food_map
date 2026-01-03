@@ -5,7 +5,7 @@ import type { AiExtractionResult, CreateSpotDto } from '@/lib/types/index'
 import { extractSpotInfo, uploadImageToR2 } from '@/lib/api/spots'
 import ImageUpload from '@/components/features/image-upload'
 import SpotForm from '@/components/forms/spot-form'
-import { Send, X } from 'lucide-react'
+import { ChevronUp, Send, X } from 'lucide-react'
 
 interface OmnibarProps {
   onSpotCreate: (spot: CreateSpotDto) => Promise<void>
@@ -19,10 +19,17 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
   const [previewSpot, setPreviewSpot] = useState<CreateSpotDto | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     inputRef.current?.focus()
+
+    const media = window.matchMedia('(min-width: 1024px)')
+    const update = () => setIsExpanded(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
   }, [])
 
   const handleTextPaste = async (e: React.ClipboardEvent) => {
@@ -162,87 +169,98 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
     return /^(https?:\/\/)?[\w.-]+\.[a-z]{2,}/i.test(value)
   }
 
+  const handleMainAction = () => {
+    if (inputText.trim()) {
+      extractFromTextOrUrl(inputText)
+      return
+    }
+
+    if (selectedImages[0]) {
+      extractFromImage(selectedImages[0])
+    }
+  }
+
   return (
     <>
-      <div className="fixed bottom-0 left-0 right-0 backdrop-blur-xl bg-white/80 dark:bg-zinc-950/80 border-t border-zinc-200/70 dark:border-zinc-800 shadow-[0_-12px_30px_-20px_rgba(0,0,0,0.3)]">
-        {!showForm && (
-          <div className="max-w-5xl mx-auto px-4 py-4 flex flex-col gap-4 md:flex-row">
-            <ImageUpload
-              onImagesSelect={handleImagesSelect}
-              onImagesUpload={handleImagesUpload}
-              className="md:w-72"
-            />
-
-            <div className="flex-1 relative">
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputText}
-                onChange={e => setInputText(e.target.value)}
-                onPaste={handleTextPaste}
-                placeholder="粘贴分享文本或链接，或上传多张截图..."
-                disabled={isExtracting}
-                className="w-full px-5 py-4 pr-12 rounded-2xl border border-zinc-200/80 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-400/70 disabled:bg-zinc-100/80"
+      <div className="fixed bottom-0 left-0 right-0 z-40">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className={`mag-shell rounded-[28px] p-4 sm:p-5 mb-4 transition-all ${isExpanded ? 'shadow-xl' : 'shadow-lg'}`}>
+            <button
+              type="button"
+              onClick={() => setIsExpanded(prev => !prev)}
+              className="flex w-full items-center justify-between text-left lg:hidden"
+            >
+              <div>
+                <p className="text-sm font-medium text-zinc-800">录入美食记录</p>
+                <p className="text-xs text-zinc-500">多图 + 文字 + 链接混合</p>
+              </div>
+              <ChevronUp
+                className={`h-5 w-5 text-orange-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
               />
-              {inputText && (
+            </button>
+
+            <div className={`${isExpanded ? 'mt-4' : 'mt-0 hidden'} lg:block`}>
+              <div className="grid gap-4 lg:grid-cols-[240px_1fr_auto]">
+                <ImageUpload
+                  onImagesSelect={handleImagesSelect}
+                  onImagesUpload={handleImagesUpload}
+                />
+
+                <div className="space-y-3">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={inputText}
+                    onChange={e => setInputText(e.target.value)}
+                    onPaste={handleTextPaste}
+                    placeholder="粘贴分享文本或链接，或上传多张截图..."
+                    disabled={isExtracting}
+                    className="mag-input w-full px-5 py-4 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                  />
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+                    <span>支持多图、文本、链接混合</span>
+                    {selectedImages.length > 0 && <span>已选 {selectedImages.length} 张</span>}
+                    {uploadedImageUrls.length > 0 && <span>已上传 {uploadedImageUrls.length} 张</span>}
+                  </div>
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => setInputText('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-zinc-600"
+                  onClick={handleMainAction}
+                  disabled={isExtracting || (!inputText.trim() && selectedImages.length === 0)}
+                  className="flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-orange-500 text-white font-semibold hover:bg-orange-600 disabled:bg-orange-300 disabled:cursor-not-allowed transition-colors"
                 >
-                  <X className="h-4 w-4" />
+                  {isExtracting ? (
+                    <>
+                      <span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
+                      识别中...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-5 w-5" />
+                      解析并继续
+                    </>
+                  )}
                 </button>
-              )}
-
-              <div className="mt-3 flex items-center gap-3 text-xs text-zinc-500">
-                <span>支持多图、文本、链接混合</span>
-                {selectedImages.length > 0 && (
-                  <span>已选 {selectedImages.length} 张图片</span>
-                )}
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                if (inputText.trim()) {
-                  extractFromTextOrUrl(inputText)
-                } else if (selectedImages[0]) {
-                  extractFromImage(selectedImages[0])
-                }
-              }}
-              disabled={isExtracting || (!inputText.trim() && selectedImages.length === 0)}
-              className="flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-orange-500 text-white font-semibold hover:bg-orange-600 disabled:bg-orange-300 disabled:cursor-not-allowed transition-colors"
-            >
-              {isExtracting ? (
-                <>
-                  <span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
-                  识别中...
-                </>
-              ) : (
-                <>
-                  <Send className="h-5 w-5" />
-                  解析并继续
-                </>
-              )}
-            </button>
+            {error && (
+              <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="flex items-center justify-between">
+                  <p className="flex-1">{error}</p>
+                  <button
+                    type="button"
+                    onClick={() => setError(null)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-
-        {error && (
-          <div className="bg-red-50 border-t border-red-200 px-4 py-3">
-            <div className="max-w-5xl mx-auto flex items-center justify-between">
-              <p className="text-red-700 flex-1">{error}</p>
-              <button
-                type="button"
-                onClick={() => setError(null)}
-                className="text-red-600 hover:text-red-800"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
 
       {showForm && previewSpot && (
