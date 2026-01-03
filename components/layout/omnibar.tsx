@@ -27,7 +27,7 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
     inputRef.current?.focus()
 
     const media = window.matchMedia('(min-width: 1024px)')
-    const update = () => setIsExpanded(media.matches)
+    const update = () => setIsExpanded(media.matches ? false : true)
     update()
     media.addEventListener('change', update)
     return () => media.removeEventListener('change', update)
@@ -236,7 +236,7 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
                     onPaste={handleTextPaste}
                     placeholder="粘贴分享文本或链接，或上传多张截图..."
                     disabled={isExtracting}
-                    className="mag-input w-full px-5 py-4 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    className="mag-input w-full px-5 py-4 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)] bg-white"
                   />
                   <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500">
                     <span>支持多图、文本、链接混合</span>

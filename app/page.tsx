@@ -10,6 +10,7 @@ export default function HomePage() {
   const [spots, setSpots] = useState<FoodSpot[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showActions, setShowActions] = useState(false)
 
   useEffect(() => {
     loadSpots()
@@ -102,32 +103,88 @@ export default function HomePage() {
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-sm">
               <span className="mag-chip px-4 py-2 rounded-full text-zinc-600">
                 {spots.length} 个记录
               </span>
-              <a
-                href="/ai-planner"
-                className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+              <div className="hidden md:flex items-center gap-2">
+                <a
+                  href="/ai-planner"
+                  className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+                >
+                  AI 规划
+                </a>
+                <a
+                  href="/trips"
+                  className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+                >
+                  旅途规划
+                </a>
+                <a
+                  href="/settings"
+                  className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+                >
+                  设置
+                </a>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowActions(true)}
+                className="md:hidden px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
               >
-                AI 规划
-              </a>
-              <a
-                href="/trips"
-                className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
-              >
-                旅途规划
-              </a>
-              <a
-                href="/settings"
-                className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
-              >
-                设置
-              </a>
+                菜单
+              </button>
             </div>
           </div>
         </div>
       </header>
+
+      <div
+        className={`fixed inset-0 z-50 transition-opacity md:hidden ${
+          showActions ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+      >
+        <div
+          className="absolute inset-0 bg-black/20"
+          onClick={() => setShowActions(false)}
+        />
+        <div
+          className={`absolute right-0 top-0 h-full w-64 bg-white shadow-2xl border-l border-orange-100 transition-transform ${
+            showActions ? 'translate-x-0' : 'translate-x-full'
+          }`}
+        >
+          <div className="p-5 flex items-center justify-between border-b border-orange-100">
+            <span className="font-medium text-zinc-800">操作</span>
+            <button
+              type="button"
+              onClick={() => setShowActions(false)}
+              className="text-zinc-400 hover:text-zinc-600"
+            >
+              关闭
+            </button>
+          </div>
+          <div className="p-5 flex flex-col gap-3 text-sm">
+            <a
+              href="/ai-planner"
+              className="px-4 py-3 rounded-2xl border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+            >
+              AI 规划
+            </a>
+            <a
+              href="/trips"
+              className="px-4 py-3 rounded-2xl border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+            >
+              旅途规划
+            </a>
+            <a
+              href="/settings"
+              className="px-4 py-3 rounded-2xl border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+            >
+              设置
+            </a>
+          </div>
+        </div>
+      </div>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
         {isLoading ? (

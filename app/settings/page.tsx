@@ -239,17 +239,20 @@ export default function SettingsPage() {
                   type="password"
                   value={form.aiKey}
                   onChange={e => handleChange('aiKey', e.target.value)}
-                  placeholder={stored.aiKey ? '已保存本地（保持为空即沿用）' : 'sk-...（留空则使用环境变量）'}
+                  placeholder="留空则使用环境变量"
                   className="w-full px-4 py-3 rounded-2xl border border-orange-100 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
                 />
                 {stored.aiKey && (
-                  <button
-                    type="button"
-                    onClick={() => clearLocalSecret('aiKey')}
-                    className="mt-2 text-xs text-orange-600 hover:text-orange-700"
-                  >
-                    清除本地覆盖
-                  </button>
+                  <div className="mt-2 flex items-center gap-3">
+                    <span className="text-xs text-zinc-500">已在本地保存，不会显示明文</span>
+                    <button
+                      type="button"
+                      onClick={() => clearLocalSecret('aiKey')}
+                      className="text-xs text-orange-600 hover:text-orange-700"
+                    >
+                      清除本地覆盖
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -293,17 +296,20 @@ export default function SettingsPage() {
                   type="password"
                   value={form.amapKey}
                   onChange={e => handleChange('amapKey', e.target.value)}
-                  placeholder={stored.amapKey ? '已保存本地（保持为空即沿用）' : '留空则使用环境变量'}
+                  placeholder="留空则使用环境变量"
                   className="w-full px-4 py-3 rounded-2xl border border-orange-100 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
                 />
                 {stored.amapKey && (
-                  <button
-                    type="button"
-                    onClick={() => clearLocalSecret('amapKey')}
-                    className="mt-2 text-xs text-orange-600 hover:text-orange-700"
-                  >
-                    清除本地覆盖
-                  </button>
+                  <div className="mt-2 flex items-center gap-3">
+                    <span className="text-xs text-zinc-500">已在本地保存，不会显示明文</span>
+                    <button
+                      type="button"
+                      onClick={() => clearLocalSecret('amapKey')}
+                      className="text-xs text-orange-600 hover:text-orange-700"
+                    >
+                      清除本地覆盖
+                    </button>
+                  </div>
                 )}
                 <p className="text-xs text-zinc-500 mt-2">
                   获取地址：https://console.amap.com/dev/key/app
