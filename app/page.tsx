@@ -85,44 +85,46 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen pb-44">
+    <div className="min-h-screen page-shell">
       <header className="sticky top-0 z-40 backdrop-blur-lg bg-white/70 border-b border-orange-100">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="h-10 w-10 shrink-0 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center shadow-sm">
                 <Sparkles className="h-5 w-5" />
               </div>
-              <h1 className="text-3xl font-semibold font-display text-orange-600">
-                GourmetLog
-              </h1>
+              <div className="min-w-0">
+                <h1 className="text-2xl sm:text-3xl font-semibold font-display text-orange-600 leading-tight">
+                  GourmetLog
+                </h1>
+                <p className="text-xs sm:text-sm text-zinc-600">
+                  私人美食外脑 · 轻柔留白 · 杂志式卡片
+                </p>
+              </div>
             </div>
-            <p className="text-sm text-zinc-600">
-              私人美食外脑 · 轻柔留白 · 杂志式卡片
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="mag-chip px-4 py-2 rounded-full text-zinc-600">
-              {spots.length} 个记录
-            </span>
-            <a
-              href="/ai-planner"
-              className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
-            >
-              AI 规划
-            </a>
-            <a
-              href="/trips"
-              className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
-            >
-              旅途规划
-            </a>
-            <a
-              href="/settings"
-              className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
-            >
-              设置
-            </a>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="mag-chip px-4 py-2 rounded-full text-zinc-600">
+                {spots.length} 个记录
+              </span>
+              <a
+                href="/ai-planner"
+                className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+              >
+                AI 规划
+              </a>
+              <a
+                href="/trips"
+                className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+              >
+                旅途规划
+              </a>
+              <a
+                href="/settings"
+                className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+              >
+                设置
+              </a>
+            </div>
           </div>
         </div>
       </header>
@@ -184,23 +186,23 @@ export default function HomePage() {
                   <div className="grid gap-6 lg:grid-cols-[1.1fr_1.4fr]">
                     {images.length > 0 ? (
                       <div className="space-y-3">
-                        <div className="overflow-hidden rounded-2xl border border-orange-100">
+                        <div className="overflow-hidden rounded-2xl border border-orange-100 image-frame">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={images[0]}
                             alt={spot.name}
-                            className="h-44 w-full object-cover"
+                            className="h-full w-full object-cover"
                           />
                         </div>
                         {images.length > 1 && (
                           <div className="grid grid-cols-2 gap-3">
                             {images.slice(1, 3).map((url, idx) => (
-                              <div key={`${url}-${idx}`} className="overflow-hidden rounded-2xl border border-orange-100">
+                              <div key={`${url}-${idx}`} className="overflow-hidden rounded-2xl border border-orange-100 image-frame-sm">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                   src={url}
                                   alt={`${spot.name}-${idx}`}
-                                  className="h-24 w-full object-cover"
+                                  className="h-full w-full object-cover"
                                 />
                               </div>
                             ))}

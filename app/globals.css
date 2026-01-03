@@ -20,6 +20,25 @@ body {
   min-height: 100vh;
 }
 
+html,
+body {
+  width: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+.page-shell {
+  padding-bottom: calc(var(--omnibar-height, 240px) + env(safe-area-inset-bottom));
+}
+
+.image-frame {
+  aspect-ratio: 4 / 3;
+}
+
+.image-frame-sm {
+  aspect-ratio: 3 / 2;
+}
+
 body::before {
   content: "";
   position: fixed;

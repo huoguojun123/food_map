@@ -21,6 +21,7 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
   const [showForm, setShowForm] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const shellRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -30,6 +31,23 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
     update()
     media.addEventListener('change', update)
     return () => media.removeEventListener('change', update)
+  }, [])
+
+  useEffect(() => {
+    if (!shellRef.current) {
+      return
+    }
+
+    const observer = new ResizeObserver(entries => {
+      const entry = entries[0]
+      if (entry) {
+        const height = Math.ceil(entry.contentRect.height)
+        document.documentElement.style.setProperty('--omnibar-height', `${height}px`)
+      }
+    })
+
+    observer.observe(shellRef.current)
+    return () => observer.disconnect()
   }, [])
 
   const handleTextPaste = async (e: React.ClipboardEvent) => {
@@ -184,7 +202,10 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
     <>
       <div className="fixed bottom-0 left-0 right-0 z-40">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className={`mag-shell rounded-[28px] p-4 sm:p-5 mb-4 transition-all ${isExpanded ? 'shadow-xl' : 'shadow-lg'}`}>
+          <div
+            ref={shellRef}
+            className={`mag-shell rounded-[28px] p-4 sm:p-5 mb-4 transition-all ${isExpanded ? 'shadow-xl' : 'shadow-lg'}`}
+          >
             <button
               type="button"
               onClick={() => setIsExpanded(prev => !prev)}
@@ -228,7 +249,7 @@ export default function Omnibar({ onSpotCreate }: OmnibarProps) {
                   type="button"
                   onClick={handleMainAction}
                   disabled={isExtracting || (!inputText.trim() && selectedImages.length === 0)}
-                  className="flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-orange-500 text-white font-semibold hover:bg-orange-600 disabled:bg-orange-300 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-orange-500 text-white font-semibold hover:bg-orange-600 disabled:bg-orange-300 disabled:cursor-not-allowed transition-colors lg:h-full"
                 >
                   {isExtracting ? (
                     <>
