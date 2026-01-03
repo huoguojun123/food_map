@@ -25,7 +25,7 @@ export function getDatabase(): Database.Database {
     db = new Database(DATABASE_PATH);
 
     // Enable WAL mode for better performance
-    db.pragma('journal_mode = WAL');
+    db.exec('PRAGMA journal_mode = WAL');
 
     // Initialize tables
     initializeDatabase();
