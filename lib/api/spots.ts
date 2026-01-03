@@ -1,8 +1,8 @@
 // Spots API client functions
 // Provides type-safe API calls for restaurant operations
 
-import { apiClient } from './client.js';
-import type { FoodSpot, CreateSpotDto, AiExtractionResult } from '../types/index.js';
+import { apiClient } from './client';
+import type { FoodSpot, CreateSpotDto, AiExtractionResult } from '../types/index';
 
 /**
  * Extract restaurant info from image or text using AI
