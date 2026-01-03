@@ -1,7 +1,7 @@
 // Database connection module for SQLite
-// Uses better-sqlite3 for Bun compatibility and performance
+// Uses bun:sqlite (built-in) for Bun compatibility
 
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 import { createTables, insertSampleData } from '../../lib/db/schema.js';
 
 // Database path from environment variable or default
