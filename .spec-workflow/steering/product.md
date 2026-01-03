@@ -1,4 +1,4 @@
-# Product Overview - GourmetLog (私人美食外脑)
+﻿# Product Overview - GourmetLog (私人美食外脑)
 
 ## Product Purpose
 **核心理念**："只记位置，不看地图；全靠 AI，决策食物。"

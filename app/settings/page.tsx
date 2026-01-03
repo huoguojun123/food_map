@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useEffect, useState } from 'react'
 import { Save } from 'lucide-react'
@@ -60,7 +60,7 @@ export default function SettingsPage() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(form))
       setSaveMessage({
         type: 'success',
-        text: result?.message || '配置已保存，后端需重启后生效。',
+        text: result?.message || '配置已保存，后端需重启后生效',
       })
     } catch (error) {
       setSaveMessage({
@@ -139,7 +139,7 @@ export default function SettingsPage() {
                   type="password"
                   value={form.aiKey}
                   onChange={e => handleChange('aiKey', e.target.value)}
-                  placeholder="sk-...（仅保存于本机）"
+                  placeholder="sk-...（仅保存在本机）"
                   className="w-full px-4 py-3 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>

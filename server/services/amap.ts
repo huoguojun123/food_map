@@ -1,4 +1,4 @@
-// AMap (高德地图) Geocoding API service
+﻿// AMap (Gaode) Geocoding API service
 // Converts address text to latitude/longitude coordinates
 
 const AMAP_KEY = process.env.AMAP_KEY
@@ -28,7 +28,7 @@ function getFromCache(address: string, city?: string): GeocodingResult | null {
   const entry = geocodeCache.get(cacheKey)
 
   if (entry && entry.expiresAt > Date.now()) {
-    console.log('📦 Using cached geocode result')
+    console.log('Using cached geocode result')
     return entry.data
   }
 
@@ -57,7 +57,7 @@ export async function geocode(address: string, city?: string): Promise<Geocoding
     return cached
   }
 
-  console.log(`📍 Geocoding: ${address}${city ? ` (${city})` : ''}...`)
+  console.log(`Geocoding: ${address}${city ? ` (${city})` : ''}...`)
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
@@ -110,7 +110,7 @@ export async function geocode(address: string, city?: string): Promise<Geocoding
 
     setCache(address, city, result)
 
-    console.log('✅ Geocode successful:', result.location)
+    console.log('Geocode successful:', result.location)
     return result
   } catch (error: unknown) {
     clearTimeout(timeoutId)

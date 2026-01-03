@@ -1,4 +1,4 @@
-// OpenAI API service for vision and text operations
+﻿// OpenAI API service for vision and text operations
 // Uses fetch API directly for lightweight memory footprint
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
@@ -19,7 +19,7 @@ async function retryWithBackoff<T>(
       if (i === retries) throw error
 
       const delay = Math.pow(2, i) * 1000
-      console.warn(`⚠️ Retry ${i + 1}/${retries} after ${delay}ms`, error)
+      console.warn(`Retry ${i + 1}/${retries} after ${delay}ms`, error)
       await new Promise(resolve => setTimeout(resolve, delay))
     }
   }
@@ -35,7 +35,7 @@ const IMAGE_SYSTEM_PROMPT = `
 - rating: 评分（可选，1-5 之间小数）
 - dishes: 推荐菜品列表（可选，字符串数组）
 - vibe: 氛围描述（可选，短文本）
-- summary: AI 生成总结，最多 20 字，简洁有观点
+- summary: AI 生成总结，最多20字，简洁有观点
 
 示例：
 {
@@ -48,7 +48,7 @@ const IMAGE_SYSTEM_PROMPT = `
   "summary": "排队两小时，值不值？"
 }
 
-只返回 JSON，不要输出解释文字。
+只返回JSON，不要输出解释文字。
 `
 
 const TEXT_SYSTEM_PROMPT = `
@@ -60,9 +60,9 @@ const TEXT_SYSTEM_PROMPT = `
 - rating: 评分（可选，1-5 之间小数）
 - dishes: 提到的菜品（可选，字符串数组）
 - vibe: 氛围或体验（可选）
-- summary: AI 生成总结，最多 20 字，简洁有观点
+- summary: AI 生成总结，最多20字，简洁有观点
 
-只返回 JSON，不要输出解释文字。
+只返回JSON，不要输出解释文字。
 `
 
 export async function extractFromImage(base64Image: string): Promise<AiExtractionResult> {
@@ -70,7 +70,7 @@ export async function extractFromImage(base64Image: string): Promise<AiExtractio
     throw new Error('OPENAI_API_KEY environment variable is not set')
   }
 
-  console.log('👁️ Extracting info from image...')
+  console.log('Extracting info from image...')
 
   const response = await retryWithBackoff(async () => {
     const controller = new AbortController()
@@ -125,7 +125,7 @@ export async function extractFromImage(base64Image: string): Promise<AiExtractio
 
   try {
     const result = JSON.parse(content.trim())
-    console.log('✅ Image extraction successful:', result.summary)
+    console.log('Image extraction successful:', result.summary)
     return result
   } catch (error) {
     console.error('Failed to parse AI response:', content)
@@ -138,7 +138,7 @@ export async function extractFromText(text: string): Promise<AiExtractionResult>
     throw new Error('OPENAI_API_KEY environment variable is not set')
   }
 
-  console.log('📝 Extracting info from text...')
+  console.log('Extracting info from text...')
 
   const response = await retryWithBackoff(async () => {
     const controller = new AbortController()
@@ -183,7 +183,7 @@ export async function extractFromText(text: string): Promise<AiExtractionResult>
 
   try {
     const result = JSON.parse(content.trim())
-    console.log('✅ Text extraction successful:', result.summary)
+    console.log('Text extraction successful:', result.summary)
     return result
   } catch (error) {
     console.error('Failed to parse AI response:', content)

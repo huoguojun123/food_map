@@ -1,4 +1,4 @@
-# Requirements Document - Spot Ingestion Feature
+﻿# Requirements Document - Spot Ingestion Feature
 
 ## Introduction
 

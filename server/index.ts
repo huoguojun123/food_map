@@ -1,4 +1,4 @@
-// Bun API Server Entry Point
+﻿// Bun API Server Entry Point
 // Uses app.ts for route handling and middleware
 
 import { handleRequest, initializeServer } from './app.js';
@@ -37,7 +37,7 @@ if (fs.existsSync(envPath)) {
       process.env[key] = value;
     }
   }
-  console.log(`✅ Loaded environment from ${envPath}`);
+  console.log(`已加载环境变量：${envPath}`);
 }
 
 // Initialize server (database, graceful shutdown)
@@ -50,4 +50,4 @@ Bun.serve({
   fetch: handleRequest,
 });
 
-console.log(`🚀 Bun API Server running on http://${API_HOST}:${API_PORT}`);
+console.log(`Bun API Server running on http://${API_HOST}:${API_PORT}`);

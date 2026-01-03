@@ -1,4 +1,4 @@
-// Database connection module for SQLite
+﻿// Database connection module for SQLite
 // Uses bun:sqlite (built-in) for Bun compatibility
 
 import { Database } from 'bun:sqlite'
@@ -23,7 +23,7 @@ export function getDatabase(): Database {
 
     initializeDatabase()
 
-    console.log('✅ Database connected at:', DATABASE_PATH)
+    console.log('Database connected at:', DATABASE_PATH)
   }
 
   return db
@@ -42,10 +42,10 @@ function initializeDatabase(): void {
       .get() as { count: number }
     if (spotCount.count === 0) {
       db.exec(insertSampleData)
-      console.log('📝 Sample data inserted')
+      console.log('Sample data inserted')
     }
   } catch (error) {
-    console.error('❌ Database initialization failed:', error)
+    console.error('Database initialization failed:', error)
     throw error
   }
 }
@@ -54,7 +54,7 @@ export function closeDatabase(): void {
   if (db) {
     db.close()
     db = null
-    console.log('🔌 Database connection closed')
+    console.log('Database connection closed')
   }
 }
 

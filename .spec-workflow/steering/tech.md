@@ -1,4 +1,4 @@
-# Technology Stack - GourmetLog
+﻿# Technology Stack - GourmetLog
 
 ## Project Type
 **Web Application (静态前端 + 轻量后端 API)**

@@ -1,4 +1,4 @@
-# Project Structure - GourmetLog
+﻿# Project Structure - GourmetLog
 
 ## Directory Organization
 
@@ -458,3 +458,4 @@ export function calculateDistance(
 | 常量文件 | `constants.ts` | `api.ts` |
 | 配置文件 | 按工具约定 | `tailwind.config.ts` |
 | 数据库脚本 | `schema.sql` | `schema.sql` |
+```

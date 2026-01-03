@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useEffect, useState } from 'react'
 import type { CreateSpotDto, FoodSpot } from '@/lib/types/index'
@@ -225,7 +225,7 @@ export default function HomePage() {
                   {spot.my_notes && (
                     <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
                       <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                        <span className="font-semibold text-zinc-700 dark:text-zinc-300">💭 笔记：</span>
+                        <span className="font-semibold text-zinc-700 dark:text-zinc-300">💬 笔记：</span>
                         {spot.my_notes}
                       </p>
                     </div>

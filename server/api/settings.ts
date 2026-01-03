@@ -1,4 +1,4 @@
-// Settings API endpoint
+﻿// Settings API endpoint
 // Persists config into .env.local for personal use
 
 type SettingsPayload = {
@@ -60,7 +60,7 @@ export async function handleSettings(req: Request): Promise<Response> {
     return Response.json({
       success: true,
       message: '配置已保存到 .env.local，重启后端后生效',
-      note: '前端配置仍保存在 localStorage 中',
+      note: '前端配置仍保存在 localStorage（仅本机）',
     })
   } catch (error) {
     console.error('Error in settings API:', error)

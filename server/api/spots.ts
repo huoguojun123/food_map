@@ -1,8 +1,7 @@
-// Spots API endpoints
+﻿// Spots API endpoints
 // Handles CRUD operations for food spots
 
 import { getDatabase } from '../db/connection.js';
-import { extractFromText, extractFromImage } from '../services/openai.js';
 import { geocode } from '../services/amap.js';
 
 /**
@@ -38,9 +37,13 @@ export async function handleCreateSpot(req: Request, url: URL): Promise<Response
           lng = geocodeResult.location.lng;
         } catch (error: unknown) {
           console.error('Geocoding failed:', error);
-          // Fall back to default location (e.g., Beijing center)
-          lat = 39.9042;
-          lng = 116.4074;
+          return Response.json(
+            {
+              error: 'Geocoding failed. Please provide coordinates manually.',
+              details: String(error),
+            },
+            { status: 422 }
+          );
         }
       } else {
         return Response.json(
@@ -80,7 +83,7 @@ export async function handleCreateSpot(req: Request, url: URL): Promise<Response
 
     const newSpot = db.prepare('SELECT * FROM food_spots WHERE id = ?').get(result.lastInsertRowid) as FoodSpot;
 
-    console.log(`✅ Created spot #${newSpot.id}: ${newSpot.name}`);
+    console.log(`Created spot #${newSpot.id}: ${newSpot.name}`);
 
     return Response.json(newSpot, { status: 201 });
   } catch (error: unknown) {
@@ -103,7 +106,7 @@ export async function handleListSpots(req: Request, url: URL): Promise<Response>
       .prepare('SELECT * FROM food_spots ORDER BY created_at DESC')
       .all() as FoodSpot[];
 
-    console.log(`📋 Listing ${spots.length} spots`);
+    console.log(`Listing ${spots.length} spots`);
 
     return Response.json({ spots });
   } catch (error: unknown) {

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useEffect, useState } from 'react'
 import type { CreateSpotDto } from '@/lib/types/index'
@@ -203,7 +203,7 @@ export default function SpotForm({
               value={formData.summary || ''}
               onChange={e => setFormData({ ...formData, summary: e.target.value })}
               className="w-full px-4 py-3 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="AI 生成的总结（最多 20 字）"
+              placeholder="AI 生成的总结（最多20字）"
               maxLength={20}
               disabled={isSaving}
             />
@@ -287,7 +287,7 @@ export default function SpotForm({
                 })
               }
               className="w-full px-4 py-3 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="例如：150"
+              placeholder="例如：50"
               disabled={isSaving}
             />
           </div>

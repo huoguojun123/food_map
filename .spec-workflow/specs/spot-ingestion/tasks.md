@@ -1,4 +1,4 @@
-# Tasks Document - Spot Ingestion Feature
+﻿# Tasks Document - Spot Ingestion Feature
 
 ## Overview
 
@@ -136,7 +136,7 @@ Restrictions:
 - Store API key in environment variables (AMAP_KEY)
 _Leverage:
 - lib/types/index.ts for GeocodingResult interface
-- server/index.ts for environment variable access
+- server/index.ts for environment variables
 _Requirements: 1.3, 技术指导
 Success:
 - server/services/amap.ts created with geocode function

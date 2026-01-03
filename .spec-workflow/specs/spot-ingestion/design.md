@@ -1,4 +1,4 @@
-# Design Document - Spot Ingestion Feature
+﻿# Design Document - Spot Ingestion Feature
 
 ## Overview
 
@@ -578,4 +578,4 @@ location /api/upload {
 
 ---
 **Status**: ✅ Approved
-**Approved At**: 2026-01-03T02:45:00Z
+**Approved At**: 2026-01-03T03:00:00Z

@@ -1,7 +1,7 @@
-{
+﻿{
   "name": "GourmetLog",
   "short_name": "GourmetLog",
-  "description": "私人美食外脑 - 只记位置，不看地图",
+  "description": "私人美食外脑 - 只记位置，不看地图；全靠 AI，决策食物。",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

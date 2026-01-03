@@ -1,4 +1,4 @@
-// Bun application setup
+﻿// Bun application setup
 // Provides CORS middleware, error handling, and route registration
 
 import { getDatabase } from './db/connection.js';
@@ -71,7 +71,7 @@ const CORS_HEADERS = {
  */
 export function registerRoute(path: string, handler: RouteHandler): void {
   routes.set(path, handler);
-  console.log(`📡 Route registered: ${path}`);
+  console.log(`Route registered: ${path}`);
 }
 
 /**
@@ -99,7 +99,7 @@ function handleOptions(): Response {
  * Error handler middleware
  */
 function handleError(error: unknown): Response {
-  console.error('❌ Server error:', error);
+  console.error('Server error:', error);
 
   if (error instanceof Error) {
     return withCors(
@@ -165,11 +165,11 @@ export async function handleRequest(req: Request): Promise<Response> {
 export function initializeServer(): void {
   // Initialize database
   getDatabase();
-  console.log('✅ Server initialized');
+  console.log('Server initialized');
 
   // Graceful shutdown
   const closeDatabase = async () => {
-    console.log('\n🛑 Shutting down server...');
+    console.log('\nShutting down server...');
     const { closeDatabase: dbClose } = await import('./db/connection.js');
     dbClose();
     process.exit(0);
