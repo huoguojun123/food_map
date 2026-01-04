@@ -91,8 +91,13 @@ export default function SpotForm({
     setCandidates([])
 
     try {
-      const combined = formData.name ? `${formData.name} ${address}` : address
-      const result = await geocodeAddress(combined, formData.city || undefined)
+      const query =
+        address.length >= 6
+          ? address
+          : formData.name
+            ? `${formData.name} ${address}`
+            : address
+      const result = await geocodeAddress(query, formData.city || undefined)
       const nextCandidates = result.candidates || []
       if (nextCandidates.length === 0) {
         setMatchError('未找到可用地址候选')
