@@ -1,10 +1,11 @@
 ﻿// Bun application setup
 // Provides CORS middleware, error handling, and route registration
 
-import { getDatabase } from './db/connection.js';
-import { handleCreateSpot, handleListSpots, handleGetSpot } from './api/spots.js';
+import { initializeDatabase } from './db/d1.js';
+import { handleCreateSpot, handleListSpots, handleGetSpot, handleUpdateSpot, handleDeleteSpot } from './api/spots.js';
 import { handleAiExtract } from './api/ai.js';
 import { handleGeocode } from './api/geocode.js';
+import { handleImageProxy } from './api/images.js';
 import { handleUpload } from './api/upload.js';
 import { handleSettings, handleSettingsTest } from './api/settings.js';
 
@@ -28,6 +29,12 @@ registerRoute('/api/spots/', async (req, url) => {
   if (req.method === 'GET') {
     return handleGetSpot(req, url);
   }
+  if (req.method === 'PUT') {
+    return handleUpdateSpot(req, url);
+  }
+  if (req.method === 'DELETE') {
+    return handleDeleteSpot(req, url);
+  }
   return Response.json({ error: 'Method not allowed' }, { status: 405 });
 });
 
@@ -48,6 +55,13 @@ registerRoute('/api/ai/geocode', async (req, url) => {
 registerRoute('/api/upload/r2', async (req, url) => {
   if (req.method === 'POST') {
     return handleUpload(req);
+  }
+  return Response.json({ error: 'Method not allowed' }, { status: 405 });
+});
+
+registerRoute('/api/images/', async (req, url) => {
+  if (req.method === 'GET') {
+    return handleImageProxy(req, url);
   }
   return Response.json({ error: 'Method not allowed' }, { status: 405 });
 });
@@ -169,16 +183,13 @@ export async function handleRequest(req: Request): Promise<Response> {
 /**
  * Initialize server (initialize database, setup graceful shutdown)
  */
-export function initializeServer(): void {
-  // Initialize database
-  getDatabase();
+export async function initializeServer(): Promise<void> {
+  await initializeDatabase();
   console.log('Server initialized');
 
   // Graceful shutdown
   const closeDatabase = async () => {
     console.log('\nShutting down server...');
-    const { closeDatabase: dbClose } = await import('./db/connection.js');
-    dbClose();
     process.exit(0);
   };
 

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS food_spots (
   lng REAL NOT NULL,
   address_text TEXT,
   city TEXT,
+  taste TEXT,
 
   -- Content
   summary TEXT, -- AI generated <20 chars
@@ -51,8 +52,8 @@ CREATE INDEX IF NOT EXISTS idx_food_spots_created ON food_spots(created_at DESC)
 
 export const insertSampleData = `
 -- Sample spot for testing
-INSERT INTO food_spots (name, lat, lng, address_text, city, summary, tags, rating, price)
+INSERT INTO food_spots (name, lat, lng, address_text, city, taste, summary, tags, rating, price)
 VALUES
-  ('示例餐厅', 39.9042, 116.4074, '北京市东城区王府井大街1号', '北京', '排队两小时的火锅店', '["火锅", "聚会"]', 4.5, 150)
+  ('示例餐厅', 39.9042, 116.4074, '北京市东城区王府井大街1号', '北京', '麻辣鲜香', '排队两小时的火锅店', '["火锅", "聚会"]', 4.5, 150)
 ON CONFLICT DO NOTHING;
 `;

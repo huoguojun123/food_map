@@ -192,11 +192,17 @@ async function testAiConnection(
     return { ok: false, message: '未提供 AI Key' }
   }
 
+  const timeoutMs = Number(process.env.OPENAI_TEST_TIMEOUT_MS || process.env.OPENAI_TIMEOUT_MS || '20000')
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 6000)
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  const startedAt = Date.now()
+  const normalizedBaseUrl = baseUrl.replace(/\/$/, '')
+  const endpoint = `${normalizedBaseUrl}/chat/completions`
 
   try {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
+    console.log('[SETTINGS] AI test start', { endpoint, model, timeoutMs })
+
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -214,12 +220,28 @@ async function testAiConnection(
 
     if (!response.ok) {
       const errorText = await response.text()
-      return { ok: false, message: `AI 连接失败：${response.status} ${errorText}` }
+      console.error('[SETTINGS] AI test failed', { status: response.status, errorText })
+      const clipped = errorText.length > 200 ? `${errorText.slice(0, 200)}...` : errorText
+      return {
+        ok: false,
+        message: `AI 连接失败：${response.status}（${endpoint}）${clipped}`,
+      }
     }
 
-    return { ok: true, message: 'AI 连接正常' }
+    const duration = Date.now() - startedAt
+    console.log('[SETTINGS] AI test ok', { duration })
+    return { ok: true, message: `AI 连接正常（${duration}ms）` }
   } catch (error) {
     clearTimeout(timeoutId)
+    console.error('[SETTINGS] AI test error', error)
+
+    if (error instanceof Error && error.name === 'AbortError') {
+      return {
+        ok: false,
+        message: `AI 连接超时（${timeoutMs}ms）（${endpoint}，model=${model}），可调大 OPENAI_TEST_TIMEOUT_MS`,
+      }
+    }
+
     return {
       ok: false,
       message: error instanceof Error ? error.message : 'AI 连接失败',

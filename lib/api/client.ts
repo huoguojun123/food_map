@@ -1,7 +1,24 @@
 // API client base class
 // Provides typed HTTP methods with error handling and retry logic
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+function resolveApiBaseUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, '');
+  }
+
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'http://127.0.0.1:3001';
+    }
+    return '';
+  }
+
+  return 'http://127.0.0.1:3001';
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 const MAX_RETRIES = 2;
 
 /**
@@ -125,7 +142,16 @@ export class ApiClient {
         );
       }
 
-      return response.json() as Promise<T>;
+      if (response.status === 204) {
+        return undefined as T;
+      }
+
+      const text = await response.text();
+      if (!text) {
+        return undefined as T;
+      }
+
+      return JSON.parse(text) as T;
     });
   }
 

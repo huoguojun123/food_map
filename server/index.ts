@@ -40,14 +40,19 @@ if (fs.existsSync(envPath)) {
   console.log(`已加载环境变量：${envPath}`);
 }
 
-// Initialize server (database, graceful shutdown)
-initializeServer();
+async function bootstrap(): Promise<void> {
+  await initializeServer();
 
-// Start Bun server
-Bun.serve({
-  port: API_PORT,
-  hostname: API_HOST,
-  fetch: handleRequest,
+  Bun.serve({
+    port: API_PORT,
+    hostname: API_HOST,
+    fetch: handleRequest,
+  });
+
+  console.log(`Bun API Server running on http://${API_HOST}:${API_PORT}`);
+}
+
+bootstrap().catch(error => {
+  console.error('Server bootstrap failed:', error);
+  process.exit(1);
 });
-
-console.log(`Bun API Server running on http://${API_HOST}:${API_PORT}`);

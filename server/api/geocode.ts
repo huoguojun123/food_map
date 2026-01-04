@@ -1,7 +1,7 @@
 // Geocoding API endpoint
 // Converts address text to coordinates using AMap
 
-import { geocode } from '../services/amap.js';
+import { geocodeCandidates } from '../services/amap.js';
 
 /**
  * Handle POST /api/ai/geocode - Convert address to coordinates
@@ -18,14 +18,21 @@ export async function handleGeocode(req: Request): Promise<Response> {
       );
     }
 
-    const result = await geocode(body.address, body.city);
+    const candidates = await geocodeCandidates(body.address, body.city);
 
     return Response.json({
       success: true,
       data: {
-        lat: result.location.lat,
-        lng: result.location.lng,
-        formatted_address: result.formatted_address,
+        candidates: candidates.map(candidate => ({
+          formatted_address: candidate.formatted_address,
+          province: candidate.province,
+          city: candidate.city,
+          district: candidate.district,
+          township: candidate.township,
+          adcode: candidate.adcode,
+          lat: candidate.location.lat,
+          lng: candidate.location.lng,
+        })),
       },
     });
   } catch (error: unknown) {

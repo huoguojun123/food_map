@@ -6,6 +6,7 @@ export interface FoodSpot {
   lng: number
   address_text?: string
   city?: string
+  taste?: string
   summary?: string // AI generated <20 chars
   my_notes?: string
   tags?: string // JSON Array string: ["Hot", "Date Night"]
@@ -38,6 +39,7 @@ export interface CreateSpotDto {
   lng?: number
   address_text?: string
   city?: string
+  taste?: string
   summary?: string
   my_notes?: string
   tags?: string[]
@@ -65,6 +67,7 @@ export interface AiExtractionResult {
   rating?: number
   dishes?: string[]
   vibe?: string
+  taste?: string
   summary: string // <20 chars
 }
 

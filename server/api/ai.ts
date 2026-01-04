@@ -7,8 +7,19 @@ import { extractFromImage, extractFromText } from '../services/openai.js';
  * Handle POST /api/ai/extract - Extract restaurant info
  */
 export async function handleAiExtract(req: Request): Promise<Response> {
+  let body: any = null
+
   try {
-    const body = await req.json();
+    body = await req.json();
+    console.log('[AI] /api/ai/extract start', {
+      type: body?.type,
+      textLength: typeof body?.text === 'string' ? body.text.length : undefined,
+      url: body?.url,
+      imageBytes: typeof body?.image === 'string' ? body.image.length : undefined,
+      baseUrl: process.env.OPENAI_BASE_URL,
+      model: process.env.OPENAI_MODEL,
+      timeoutMs: process.env.OPENAI_TIMEOUT_MS,
+    })
 
     // Validate request body
     if (!body.type || (body.type !== 'image' && body.type !== 'text' && body.type !== 'url')) {
@@ -28,6 +39,7 @@ export async function handleAiExtract(req: Request): Promise<Response> {
       }
 
       const result = await extractFromImage(body.image);
+      console.log('[AI] /api/ai/extract image done')
       return Response.json({
         success: true,
         data: result,
@@ -44,6 +56,7 @@ export async function handleAiExtract(req: Request): Promise<Response> {
       }
 
       const result = await extractFromText(body.text);
+      console.log('[AI] /api/ai/extract text done')
       return Response.json({
         success: true,
         data: result,
@@ -88,7 +101,13 @@ export async function handleAiExtract(req: Request): Promise<Response> {
       { status: 400 }
     );
   } catch (error: unknown) {
-    console.error('Error in AI extract:', error);
+    const debug = {
+      type: body?.type,
+      textLength: typeof body?.text === 'string' ? body.text.length : undefined,
+      url: body?.url,
+      imageBytes: typeof body?.image === 'string' ? body.image.length : undefined,
+    }
+    console.error('Error in AI extract:', { error, debug });
 
     // Return user-friendly error message
     const errorMessage =
@@ -99,6 +118,7 @@ export async function handleAiExtract(req: Request): Promise<Response> {
         success: false,
         data: null,
         error: errorMessage,
+        debug,
       },
       { status: 500 }
     );

@@ -2,15 +2,17 @@
 
 import React, { useEffect, useState } from 'react'
 import type { CreateSpotDto, FoodSpot } from '@/lib/types/index'
-import { createSpot, listSpots } from '@/lib/api/spots'
-import Omnibar from '@/components/layout/omnibar'
-import { Clock, MapPin, Sparkles, Star } from 'lucide-react'
+import { deleteSpot, listSpots, updateSpot } from '@/lib/api/spots'
+import SpotForm from '@/components/forms/spot-form'
+import { Clock, Sparkles } from 'lucide-react'
 
 export default function HomePage() {
   const [spots, setSpots] = useState<FoodSpot[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showActions, setShowActions] = useState(false)
+  const [editingSpot, setEditingSpot] = useState<FoodSpot | null>(null)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
 
   useEffect(() => {
     loadSpots()
@@ -42,54 +44,113 @@ export default function HomePage() {
     }
   }
 
-  const handleSpotCreate = async (data: CreateSpotDto) => {
-    try {
-      const newSpot = await createSpot(data)
-      setSpots(prev => [newSpot, ...prev])
-    } catch (err) {
-      throw err
+  const handleSpotUpdate = async (data: CreateSpotDto) => {
+    if (!editingSpot) {
+      return
+    }
+    const updated = await updateSpot(editingSpot.id, data)
+    setSpots(prev => prev.map(spot => (spot.id === updated.id ? updated : spot)))
+    setEditingSpot(null)
+  }
+
+  const handleDeleteSpot = async (spot: FoodSpot) => {
+    if (!confirm(`确定删除「${spot.name}」吗？此操作不可撤销。`)) {
+      return
+    }
+    await deleteSpot(spot.id)
+    await loadSpots()
+  }
+
+  const buildEditPayload = (spot: FoodSpot): CreateSpotDto => {
+    return {
+      name: spot.name,
+      lat: spot.lat,
+      lng: spot.lng,
+      address_text: spot.address_text,
+      taste: spot.taste,
+      summary: spot.summary,
     }
   }
 
-  const getTagList = (tags?: string): string[] => {
-    if (!tags) {
-      return []
+  const formatCoord = (value?: number): string => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return '-'
+    }
+    return value.toFixed(5)
+  }
+
+  const formatText = (value?: string): string => {
+    const trimmed = value?.trim()
+    return trimmed && trimmed.length > 0 ? trimmed : '-'
+  }
+
+  const isImageUrl = (value: string): boolean => {
+    return value.startsWith('data:') || value.startsWith('http://') || value.startsWith('https://')
+  }
+
+  const buildProxyImageUrl = (key: string): string => {
+    const configured = process.env.NEXT_PUBLIC_API_URL?.trim()
+    const apiBase = configured
+      ? configured.replace(/\/$/, '')
+      : typeof window !== 'undefined' &&
+          (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'http://127.0.0.1:3001'
+        : ''
+    const encoded = key.split('/').map(encodeURIComponent).join('/')
+    return `${apiBase}/api/images/${encoded}`
+  }
+
+  const buildR2Url = (value: string): string | null => {
+    if (!value) return null
+    if (value.startsWith('data:')) return value
+
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      try {
+        const parsed = new URL(value)
+        const host = parsed.hostname.toLowerCase()
+        if (host.includes('.r2.dev') || host.includes('.r2.cloudflarestorage.com')) {
+          const key = parsed.pathname.replace(/^\/+/, '')
+          return buildProxyImageUrl(key)
+        }
+      } catch {
+        // ignore
+      }
+      return value
     }
 
-    try {
-      const parsed = JSON.parse(tags)
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return []
-    }
+    return buildProxyImageUrl(value)
   }
 
   const getImageUrls = (spot: FoodSpot): string[] => {
     const urls: string[] = []
-
     if (spot.screenshot_urls) {
       try {
         const parsed = JSON.parse(spot.screenshot_urls)
         if (Array.isArray(parsed)) {
-          urls.push(...parsed.filter(url => typeof url === 'string'))
+          parsed.forEach(url => {
+            if (typeof url === 'string') {
+              const resolved = buildR2Url(url)
+              if (resolved) urls.push(resolved)
+            }
+          })
         }
       } catch {
-        // ignore invalid json
+        const resolved = buildR2Url(spot.screenshot_urls)
+        if (resolved) urls.push(resolved)
       }
     }
-
-    if (spot.screenshot_r2_key && spot.screenshot_r2_key.startsWith('http')) {
-      urls.push(spot.screenshot_r2_key)
+    if (spot.screenshot_r2_key) {
+      const resolved = buildR2Url(spot.screenshot_r2_key)
+      if (resolved) urls.push(resolved)
     }
-
     return urls
   }
 
   return (
-    <div className="min-h-screen page-shell">
+    <div className="min-h-screen">
       <header className="sticky top-0 z-40 backdrop-blur-lg bg-white/70 border-b border-orange-100">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex items-start gap-3 min-w-0">
               <div className="h-10 w-10 shrink-0 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center shadow-sm">
                 <Sparkles className="h-5 w-5" />
@@ -99,30 +160,30 @@ export default function HomePage() {
                   GourmetLog
                 </h1>
                 <p className="text-xs sm:text-sm text-zinc-600">
-                  私人美食外脑 · 轻柔留白 · 杂志式卡片
+                  私人美食外脑 · 极简清单
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <span className="mag-chip px-4 py-2 rounded-full text-zinc-600">
-                {spots.length} 个记录
+              <span className="mag-chip px-3 py-1.5 rounded-full text-zinc-600">
+                {spots.length} 条记录
               </span>
               <div className="hidden md:flex items-center gap-2">
                 <a
                   href="/ai-planner"
-                  className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+                  className="px-3 py-1.5 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
                 >
                   AI 规划
                 </a>
                 <a
                   href="/trips"
-                  className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+                  className="px-3 py-1.5 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
                 >
                   旅途规划
                 </a>
                 <a
                   href="/settings"
-                  className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+                  className="px-3 py-1.5 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
                 >
                   设置
                 </a>
@@ -130,7 +191,7 @@ export default function HomePage() {
               <button
                 type="button"
                 onClick={() => setShowActions(true)}
-                className="md:hidden px-4 py-2 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+                className="md:hidden px-3 py-1.5 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
               >
                 菜单
               </button>
@@ -186,7 +247,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         {isLoading ? (
           <div className="flex items-center justify-center py-24">
             <div className="relative">
@@ -197,173 +258,168 @@ export default function HomePage() {
             </div>
           </div>
         ) : error ? (
-          <div className="mag-card rounded-[32px] p-10 text-center">
+          <div className="mag-card rounded-[24px] p-8 text-center">
             <p className="text-orange-700 font-medium">{error}</p>
           </div>
         ) : spots.length === 0 ? (
-          <div className="text-center py-24">
-            <div className="mag-card rounded-[40px] p-10 max-w-2xl mx-auto">
-              <div className="bg-orange-100 rounded-full w-28 h-28 mx-auto mb-6 flex items-center justify-center">
-                <Sparkles className="h-14 w-14 text-orange-600" />
+          <div className="text-center py-16">
+            <div className="mag-card rounded-[28px] p-8 max-w-xl mx-auto">
+              <div className="bg-orange-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <Sparkles className="h-8 w-8 text-orange-600" />
               </div>
-              <h2 className="text-3xl font-display text-zinc-900 mb-3">
-                开始记录你的美食之旅
+              <h2 className="text-xl font-display text-zinc-900 mb-2">
+                暂无记录
               </h2>
-              <p className="text-zinc-600 mb-6">
-                添加截图、链接或文字，让 AI 帮你整理成柔和的美食档案。
+              <p className="text-sm text-zinc-600">
+                先去录入页面添加一条餐厅记录吧。
               </p>
-              <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-zinc-500">
-                <span className="mag-chip px-4 py-2 rounded-full">多图上传</span>
-                <span className="mag-chip px-4 py-2 rounded-full">链接识别</span>
-                <span className="mag-chip px-4 py-2 rounded-full">AI 自动总结</span>
-              </div>
             </div>
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6">
             <div className="flex items-center gap-3">
               <Clock className="h-5 w-5 text-orange-500" />
-              <h3 className="text-lg font-semibold text-zinc-800 font-display">
-                最近记录
-              </h3>
+              <h3 className="text-base font-semibold text-zinc-800">记录清单</h3>
               <div className="flex-1 h-px bg-gradient-to-r from-orange-200 to-transparent" />
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-              {spots.map((spot, index) => {
-                const images = getImageUrls(spot)
-
-                return (
-                  <div
-                    key={spot.id}
-                    className="mag-card rounded-[32px] p-6 space-y-6"
-                    style={{
-                      animation: `fadeInUp 0.6s ease-out ${index * 0.08}s both`,
-                    }}
-                  >
-                  <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
-                    {images.length > 0 ? (
-                      <div className="space-y-3">
-                        <div className="overflow-hidden rounded-2xl border border-orange-100 image-frame">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={images[0]}
-                            alt={spot.name}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                        {images.length > 1 && (
-                          <div className="grid grid-cols-2 gap-3">
-                            {images.slice(1, 3).map((url, idx) => (
-                              <div key={`${url}-${idx}`} className="overflow-hidden rounded-2xl border border-orange-100 image-frame-sm">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={url}
-                                  alt={`${spot.name}-${idx}`}
-                                  className="h-full w-full object-cover"
-                                />
-                              </div>
-                            ))}
-                      </div>
-                    )}
-                  </div>
-                    ) : (
-                      <div className="mag-chip rounded-2xl p-6 text-sm text-zinc-500">
-                        暂无图片，添加截图可丰富记录
-                      </div>
-                    )}
-
-                    <div className="space-y-4">
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div>
-                          <h3 className="text-2xl font-display text-zinc-900 mb-2">
-                            {spot.name}
-                          </h3>
-                          {spot.city && (
-                            <span className="text-sm text-zinc-500 inline-flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {spot.city}
-                            </span>
+            <div className="rounded-[28px] border border-orange-100 bg-white/80 shadow-sm overflow-hidden">
+              <div className="hidden lg:grid grid-cols-[0.7fr_1.1fr_2fr_0.9fr_0.9fr_1.1fr_2fr_auto] gap-4 px-5 py-3 text-xs font-semibold text-zinc-500 border-b border-orange-100">
+                <span>缩略图</span>
+                <span>店名</span>
+                <span>地址</span>
+                <span>纬度</span>
+                <span>经度</span>
+                <span>口味</span>
+                <span>简短描述</span>
+                <span className="text-right">操作</span>
+              </div>
+              <div className="divide-y divide-orange-100">
+                {spots.map(spot => {
+                  const images = getImageUrls(spot)
+                  const thumb = images[0]
+                  return (
+                    <div
+                      key={spot.id}
+                      className="grid gap-3 px-5 py-4 text-sm text-zinc-700 lg:grid-cols-[0.7fr_1.1fr_2fr_0.9fr_0.9fr_1.1fr_2fr_auto]"
+                    >
+                      <div className="flex items-center">
+                        <span className="text-xs text-zinc-400 lg:hidden">缩略图</span>
+                        <div className="mt-1 lg:mt-0">
+                          {thumb ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={thumb}
+                              alt={spot.name}
+                              className="h-14 w-20 object-cover rounded-lg border border-orange-100"
+                              onClick={() => setPreviewImage(thumb)}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  setPreviewImage(thumb)
+                                }
+                              }}
+                              style={{ cursor: 'zoom-in' }}
+                            />
+                          ) : (
+                            <div className="h-14 w-20 rounded-lg border border-dashed border-orange-200 text-[11px] text-zinc-400 flex items-center justify-center">
+                              无图
+                            </div>
                           )}
                         </div>
-                        {spot.rating !== undefined && spot.rating !== null && (
-                          <div className="mag-chip px-4 py-2 rounded-full flex items-center gap-1.5 text-orange-600">
-                            <Star className="h-4 w-4 fill-orange-500" />
-                            <span className="font-semibold">{spot.rating.toFixed(1)}</span>
-                          </div>
-                        )}
                       </div>
-
-                      {spot.summary && (
-                        <div className="bg-orange-50/70 rounded-2xl px-4 py-3">
-                          <p className="text-sm text-orange-800">{spot.summary}</p>
-                        </div>
-                      )}
-
-                      <div className="space-y-3">
-                        {spot.address_text && (
-                          <div className="flex items-start gap-2 text-sm text-zinc-600">
-                            <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5 text-orange-300" />
-                            <span className="break-words">{spot.address_text}</span>
-                          </div>
-                        )}
-
-                        {spot.price !== undefined && spot.price !== null && (
-                          <div className="flex items-center gap-2 text-sm text-zinc-600">
-                            <span className="text-orange-500 font-semibold">¥</span>
-                            <span className="font-semibold text-zinc-900 text-lg">
-                              {spot.price}
-                            </span>
-                            <span className="text-zinc-500">/人均</span>
-                          </div>
-                        )}
-
-                        {spot.tags && (
-                          <div className="flex flex-wrap gap-2">
-                            {getTagList(spot.tags).map((tag: string, idx: number) => (
-                              <span
-                                key={idx}
-                                className="mag-chip px-3 py-1.5 text-xs text-zinc-600 rounded-full"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {spot.my_notes && (
-                          <div className="mt-2 pt-4 border-t border-orange-100">
-                            <p className="text-sm text-zinc-600">
-                              <span className="font-medium text-orange-600">💬 笔记：</span>
-                              {spot.my_notes}
-                            </p>
-                          </div>
-                        )}
+                      <div>
+                        <span className="text-xs text-zinc-400 lg:hidden">店名</span>
+                        <p className="font-semibold text-zinc-900 break-words">{spot.name}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-zinc-400 lg:hidden">地址</span>
+                        <p className="break-words">{formatText(spot.address_text)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-zinc-400 lg:hidden">纬度</span>
+                        <p className="font-mono text-sm text-zinc-600">{formatCoord(spot.lat)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-zinc-400 lg:hidden">经度</span>
+                        <p className="font-mono text-sm text-zinc-600">{formatCoord(spot.lng)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-zinc-400 lg:hidden">口味</span>
+                        <p className="text-orange-700">{formatText(spot.taste)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-zinc-400 lg:hidden">简短描述</span>
+                        <p className="text-zinc-700 break-words">{formatText(spot.summary)}</p>
+                      </div>
+                      <div className="flex items-center gap-2 lg:justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setEditingSpot(spot)}
+                          className="px-3 py-1.5 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+                        >
+                          修改
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSpot(spot)}
+                          className="px-3 py-1.5 rounded-full border border-red-200 text-red-500 hover:bg-red-50 transition-colors"
+                        >
+                          删除
+                        </button>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-4 border-t border-orange-100 text-xs text-zinc-500">
-                    <Clock className="h-3.5 w-3.5 text-orange-300" />
-                    <span>
-                      {new Date(spot.created_at).toLocaleDateString('zh-CN', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
             </div>
           </div>
         )}
       </main>
 
-      <Omnibar onSpotCreate={handleSpotCreate} />
+      <a
+        href="/ingest"
+        className="fixed bottom-6 right-6 z-30 rounded-full bg-orange-500 text-white px-5 py-3 shadow-lg hover:bg-orange-600 transition-colors"
+      >
+        录入美食
+      </a>
+
+      {editingSpot && (
+        <SpotForm
+          initialData={buildEditPayload(editingSpot)}
+          isEditing={true}
+          onSave={handleSpotUpdate}
+          onCancel={() => setEditingSpot(null)}
+        />
+      )}
+
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setPreviewImage(null)}
+          role="presentation"
+        >
+          <div
+            className="max-w-5xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewImage}
+              alt="预览大图"
+              className="object-contain w-full h-full max-h-[90vh] bg-black"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setPreviewImage(null)}
+            className="absolute top-4 right-4 text-white text-lg px-3 py-2 rounded-full bg-black/40 hover:bg-black/60"
+          >
+            关闭
+          </button>
+        </div>
+      )}
     </div>
   )
 }

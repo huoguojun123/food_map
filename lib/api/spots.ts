@@ -2,7 +2,7 @@
 // Provides type-safe API calls for restaurant operations
 
 import { apiClient } from './client';
-import type { FoodSpot, CreateSpotDto, AiExtractionResult } from '../types/index';
+import type { FoodSpot, CreateSpotDto, AiExtractionResult, UpdateSpotDto } from '../types/index';
 
 /**
  * Extract restaurant info from image or text using AI
@@ -47,15 +47,52 @@ export async function getSpot(id: number): Promise<FoodSpot> {
 }
 
 /**
+ * Update a spot by ID
+ */
+export async function updateSpot(id: number, data: UpdateSpotDto): Promise<FoodSpot> {
+  const response = await apiClient.put<FoodSpot>(`/api/spots/${id}`, data);
+  return response;
+}
+
+/**
+ * Delete a spot by ID
+ */
+export async function deleteSpot(id: number): Promise<void> {
+  await apiClient.delete(`/api/spots/${id}`);
+}
+
+/**
  * Geocode address to coordinates
  */
 export async function geocodeAddress(
   address: string,
   city?: string
-): Promise<{ lat: number; lng: number }> {
+): Promise<{
+  candidates: Array<{
+    formatted_address: string
+    province?: string
+    city?: string
+    district?: string
+    township?: string
+    adcode?: string
+    lat: number
+    lng: number
+  }>
+}> {
   const response = await apiClient.post<{
     success: boolean;
-    data: { lat: number; lng: number; formatted_address: string };
+    data: {
+      candidates: Array<{
+        formatted_address: string;
+        province?: string;
+        city?: string;
+        district?: string;
+        township?: string;
+        adcode?: string;
+        lat: number;
+        lng: number;
+      }>;
+    };
     error?: string;
   }>('/api/ai/geocode', { address, city });
 
@@ -64,8 +101,7 @@ export async function geocodeAddress(
   }
 
   return {
-    lat: response.data.lat,
-    lng: response.data.lng,
+    candidates: response.data.candidates || [],
   };
 }
 

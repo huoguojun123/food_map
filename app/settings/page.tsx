@@ -241,7 +241,7 @@ export default function SettingsPage() {
                   value={form.aiKey}
                   onChange={e => handleChange('aiKey', e.target.value)}
                   placeholder="留空则使用环境变量"
-                  autoComplete="new-password"
+                  autoComplete="off"
                   name="ai-key"
                   className="w-full px-4 py-3 rounded-2xl border border-orange-100 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
                 />
@@ -300,7 +300,7 @@ export default function SettingsPage() {
                   value={form.amapKey}
                   onChange={e => handleChange('amapKey', e.target.value)}
                   placeholder="留空则使用环境变量"
-                  autoComplete="new-password"
+                  autoComplete="off"
                   name="amap-key"
                   className="w-full px-4 py-3 rounded-2xl border border-orange-100 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
                 />

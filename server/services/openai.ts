@@ -4,9 +4,215 @@
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o'
+const OPENAI_TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || OPENAI_MODEL
+const OPENAI_VISION_MODEL = process.env.OPENAI_VISION_MODEL || OPENAI_MODEL
+// Mock mode: when OPENAI_MOCK=1, skip network and return stub data
+const OPENAI_MOCK = process.env.OPENAI_MOCK === '1'
 
-const API_TIMEOUT = 10000
+// 默认 120s（第三方兼容网关通常更慢），支持通过环境变量调整
+const API_TIMEOUT = Number(process.env.OPENAI_TIMEOUT_MS || '120000')
 const MAX_RETRIES = 2
+
+function normalizeBaseUrl(url: string): string {
+  return url.replace(/\/$/, '')
+}
+
+function extractJsonObjectString(raw: string): string {
+  const trimmed = raw.trim()
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
+  const candidate = (fenced ? fenced[1] : trimmed).trim()
+  const start = candidate.indexOf('{')
+  const end = candidate.lastIndexOf('}')
+  if (start !== -1 && end !== -1 && end > start) {
+    return candidate.slice(start, end + 1)
+  }
+  return candidate
+}
+
+function parseJsonFromAi<T>(raw: string): T {
+  const jsonText = extractJsonObjectString(raw)
+  return JSON.parse(jsonText) as T
+}
+
+async function readChatCompletionContent(res: Response): Promise<string> {
+  const contentType = res.headers.get('content-type') || ''
+  if (contentType.includes('text/event-stream')) {
+    return readChatCompletionContentFromSse(res)
+  }
+
+  const payload = (await res.json()) as any
+  return payload?.choices?.[0]?.message?.content || ''
+}
+
+async function readChatCompletionContentFromSse(res: Response): Promise<string> {
+  if (!res.body) {
+    throw new Error('Empty response body')
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let content = ''
+  let eventLines: string[] = []
+  let loggedFirstChunk = false
+  let totalBytes = 0
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) {
+      break
+    }
+
+    if (value) {
+      totalBytes += value.length
+      if (!loggedFirstChunk) {
+        loggedFirstChunk = true
+        console.log('[AI] SSE first chunk', { bytes: value.length })
+      }
+    }
+
+    buffer += decoder.decode(value, { stream: true })
+
+    while (true) {
+      const newlineIndex = buffer.indexOf('\n')
+      if (newlineIndex === -1) {
+        break
+      }
+
+      const rawLine = buffer.slice(0, newlineIndex)
+      buffer = buffer.slice(newlineIndex + 1)
+
+      const line = rawLine.replace(/\r$/, '')
+      if (line.trim() === '') {
+        const data = eventLines.join('\n').trim()
+        eventLines = []
+
+        if (!data) {
+          continue
+        }
+
+        if (data === '[DONE]') {
+          await reader.cancel()
+          return content
+        }
+
+        try {
+          const parsed = JSON.parse(data) as any
+          const delta = parsed?.choices?.[0]?.delta?.content
+          const message = parsed?.choices?.[0]?.message?.content
+          if (typeof delta === 'string') {
+            content += delta
+          } else if (typeof message === 'string') {
+            content += message
+          }
+        } catch {
+          // ignore malformed chunks
+        }
+        continue
+      }
+
+      const trimmed = line.trim()
+      if (!trimmed.startsWith('data:')) {
+        continue
+      }
+      const dataPart = trimmed.slice(5).trim()
+      if (!dataPart) {
+        continue
+      }
+
+      if (dataPart === '[DONE]') {
+        await reader.cancel()
+        return content
+      }
+
+      try {
+        const parsed = JSON.parse(dataPart) as any
+        const delta = parsed?.choices?.[0]?.delta?.content
+        const message = parsed?.choices?.[0]?.message?.content
+        if (typeof delta === 'string') {
+          content += delta
+        } else if (typeof message === 'string') {
+          content += message
+        }
+      } catch {
+        // 多行 JSON（非标准）时，先累计，遇到空行再一起解析
+        eventLines.push(dataPart)
+      }
+    }
+  }
+
+  const tailData = eventLines.join('\n').trim()
+  if (tailData) {
+    try {
+      const parsed = JSON.parse(tailData) as any
+      const delta = parsed?.choices?.[0]?.delta?.content
+      const message = parsed?.choices?.[0]?.message?.content
+      if (typeof delta === 'string') {
+        content += delta
+      } else if (typeof message === 'string') {
+        content += message
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return content
+}
+
+async function requestChatCompletion(params: {
+  messages: any[]
+  max_tokens: number
+  model?: string
+}): Promise<string> {
+  if (!OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY environment variable is not set')
+  }
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+
+  try {
+    const baseUrl = normalizeBaseUrl(OPENAI_BASE_URL)
+    const endpoint = `${baseUrl}/chat/completions`
+    const startedAt = Date.now()
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: params.model || OPENAI_MODEL,
+        messages: params.messages,
+        max_tokens: params.max_tokens,
+        stream: true,
+        temperature: 0,
+      }),
+      signal: controller.signal,
+    })
+
+    console.log('[AI] chat/completions response', {
+      status: res.status,
+      contentType: res.headers.get('content-type'),
+      durationMs: Date.now() - startedAt,
+    })
+
+    if (!res.ok) {
+      const errorText = await res.text()
+      throw new Error(`OpenAI API error: ${res.status} - ${errorText}`)
+    }
+
+    return await readChatCompletionContent(res)
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`AI request timeout after ${API_TIMEOUT}ms`)
+    }
+    throw error
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
 
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
@@ -16,6 +222,9 @@ async function retryWithBackoff<T>(
     try {
       return await fn()
     } catch (error) {
+      if (error instanceof Error && /timeout/i.test(error.message)) {
+        throw error
+      }
       if (i === retries) throw error
 
       const delay = Math.pow(2, i) * 1000
@@ -27,104 +236,98 @@ async function retryWithBackoff<T>(
 }
 
 const IMAGE_SYSTEM_PROMPT = `
-你是一个专业的美食信息提取助手。请从图片中提取餐厅信息，以 JSON 格式返回。
-必须提取字段：
-- name: 餐厅名称（必填）
-- address_text: 地址文本（可选）
-- price: 人均价格（可选，整数）
-- rating: 评分（可选，1-5 之间小数）
-- dishes: 推荐菜品列表（可选，字符串数组）
-- vibe: 氛围描述（可选，短文本）
-- summary: AI 生成总结，最多20字，简洁有观点
-
-示例：
+你是美食信息提取助手。请从图片中提取餐厅信息，只返回 JSON：
 {
-  "name": "蜀大侠火锅",
-  "address_text": "北京市朝阳区三里屯路19号",
-  "price": 150,
-  "rating": 4.5,
-  "dishes": ["麻辣牛肉", "冰粉"],
-  "vibe": "热闹，排队长",
-  "summary": "排队两小时，值不值？"
+  "name": "餐厅名称",
+  "address_text": "尽量完整的地址文本（缺失写空）",
+  "taste": "口味/风格短语（如麻辣鲜香/清淡/炭烤/奶香），无法判断用“风格未知”",
+  "summary": "最多20字，必须包含口味/口感关键词"
 }
 
-只返回JSON，不要输出解释文字。
+要求：
+- 优先识别店名与地址，避免遗漏
+- 若图片中出现明显口味/口感词（麻辣/香辣/清淡/咸鲜/甜辣/酸辣/浓郁/酥脆等），请提取为 taste
+- summary 必须 ≤20 字
+- summary 必须包含 taste（若 taste 为“风格未知”，summary 也要包含该词）
+只返回 JSON，不要输出其它文字。
 `
 
 const TEXT_SYSTEM_PROMPT = `
-你是一个专业的美食信息解析助手。请从分享文本中提取餐厅信息，以 JSON 格式返回。
-必须提取字段：
-- name: 餐厅名称（必填）
-- address_text: 地址文本（可选）
-- price: 人均价格（可选，整数）
-- rating: 评分（可选，1-5 之间小数）
-- dishes: 提到的菜品（可选，字符串数组）
-- vibe: 氛围或体验（可选）
-- summary: AI 生成总结，最多20字，简洁有观点
+你是美食信息解析助手。请从文本中提取餐厅信息，只返回 JSON：
+{
+  "name": "餐厅名称",
+  "address_text": "尽量完整的地址文本（缺失写空）",
+  "taste": "口味/风格短语（如麻辣鲜香/清淡/炭烤/奶香），无法判断用“风格未知”",
+  "summary": "最多20字，必须包含口味/口感关键词"
+}
 
-只返回JSON，不要输出解释文字。
+要求：
+- 优先识别店名与地址，避免遗漏
+- 若文本中明确给出“口味/风格/推荐/特色”等描述（如 麻辣鲜香/清淡/咸鲜/甜辣/酸辣/浓郁/酥脆），请优先提取为 taste
+- summary 必须 ≤20 字
+- summary 必须包含 taste（若 taste 为“风格未知”，summary 也要包含该词）
+只返回 JSON，不要输出其它文字。
+`
+
+const SUMMARY_SYSTEM_PROMPT = `
+你是美食记录整理助手。根据提供的信息生成口味与简短描述。
+仅返回 JSON，格式：
+{
+  "taste": "口味/风格，短语",
+  "summary": "最多20字的简短描述，必须包含口味关键词"
+}
+
+要求：
+- 如果提供了口味，就保持该口味，不要改写。
+- 如果无法判断口味，用“风格未知”。
+- summary 需要简洁有重点，20字以内。
 `
 
 export async function extractFromImage(base64Image: string): Promise<AiExtractionResult> {
-  if (!OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY environment variable is not set')
-  }
-
-  console.log('Extracting info from image...')
-
-  const response = await retryWithBackoff(async () => {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
-
-    try {
-      const res = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: OPENAI_MODEL,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: IMAGE_SYSTEM_PROMPT },
-                {
-                  type: 'image_url',
-                  image_url: {
-                    url: `data:image/jpeg;base64,${base64Image}`,
-                  },
-                },
-              ],
-            },
-          ],
-          max_tokens: 1000,
-        }),
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!res.ok) {
-        const errorText = await res.text()
-        throw new Error(`OpenAI API error: ${res.status} - ${errorText}`)
-      }
-
-      return await res.json()
-    } catch (error: unknown) {
-      clearTimeout(timeoutId)
-      throw error
+  if (OPENAI_MOCK) {
+    return {
+      name: 'Mock餐厅',
+      address_text: 'Mock地址',
+      taste: '麻辣鲜香',
+      price: 99,
+      rating: 4.5,
+      dishes: ['招牌菜'],
+      summary: 'Mock摘要',
     }
+  }
+  console.log('[AI] extractFromImage start', {
+    model: OPENAI_VISION_MODEL,
+    base: OPENAI_BASE_URL,
+    timeout: API_TIMEOUT,
+    imageBytes: base64Image?.length,
   })
 
-  const content = response.choices[0]?.message?.content
+  const content = await retryWithBackoff(async () =>
+    requestChatCompletion({
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: IMAGE_SYSTEM_PROMPT },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:image/jpeg;base64,${base64Image}`,
+              },
+            },
+          ],
+        },
+      ],
+      max_tokens: 512,
+      model: OPENAI_VISION_MODEL,
+    })
+  )
   if (!content) {
     throw new Error('No content returned from AI')
   }
 
   try {
-    const result = JSON.parse(content.trim())
+    const result = parseJsonFromAi<AiExtractionResult>(content)
     console.log('Image extraction successful:', result.summary)
     return result
   } catch (error) {
@@ -134,55 +337,40 @@ export async function extractFromImage(base64Image: string): Promise<AiExtractio
 }
 
 export async function extractFromText(text: string): Promise<AiExtractionResult> {
-  if (!OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY environment variable is not set')
-  }
-
-  console.log('Extracting info from text...')
-
-  const response = await retryWithBackoff(async () => {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
-
-    try {
-      const res = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: OPENAI_MODEL,
-          messages: [
-            { role: 'system', content: TEXT_SYSTEM_PROMPT },
-            { role: 'user', content: text },
-          ],
-          max_tokens: 500,
-        }),
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!res.ok) {
-        const errorText = await res.text()
-        throw new Error(`OpenAI API error: ${res.status} - ${errorText}`)
-      }
-
-      return await res.json()
-    } catch (error: unknown) {
-      clearTimeout(timeoutId)
-      throw error
+  if (OPENAI_MOCK) {
+    return {
+      name: 'Mock餐厅',
+      address_text: 'Mock地址',
+      taste: '清淡',
+      price: 50,
+      rating: 4.0,
+      dishes: ['Mock菜'],
+      summary: 'Mock文本摘要',
     }
+  }
+  console.log('[AI] extractFromText start', {
+    model: OPENAI_TEXT_MODEL,
+    base: OPENAI_BASE_URL,
+    timeout: API_TIMEOUT,
+    textLength: text?.length,
   })
 
-  const content = response.choices[0]?.message?.content
+  const content = await retryWithBackoff(async () =>
+    requestChatCompletion({
+      messages: [
+        { role: 'system', content: TEXT_SYSTEM_PROMPT },
+        { role: 'user', content: text },
+      ],
+      max_tokens: 256,
+      model: OPENAI_TEXT_MODEL,
+    })
+  )
   if (!content) {
     throw new Error('No content returned from AI')
   }
 
   try {
-    const result = JSON.parse(content.trim())
+    const result = parseJsonFromAi<AiExtractionResult>(content)
     console.log('Text extraction successful:', result.summary)
     return result
   } catch (error) {
@@ -191,11 +379,64 @@ export async function extractFromText(text: string): Promise<AiExtractionResult>
   }
 }
 
-export default { extractFromImage, extractFromText }
+export async function generateTasteSummary(input: {
+  name: string
+  address_text?: string
+  city?: string
+  taste?: string
+  summary?: string
+  original_share_text?: string
+  source_url?: string
+}): Promise<{ taste: string; summary: string }> {
+  if (OPENAI_MOCK) {
+    return { taste: input.taste || '风格未知', summary: 'Mock简短描述' }
+  }
+  if (!OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY environment variable is not set')
+  }
+
+  const promptLines = [
+    `店名：${input.name}`,
+    input.address_text ? `地址：${input.address_text}` : '',
+    input.city ? `城市：${input.city}` : '',
+    input.taste ? `口味：${input.taste}` : '',
+    input.summary ? `已有描述：${input.summary}` : '',
+    input.original_share_text ? `分享文本：${input.original_share_text}` : '',
+    input.source_url ? `链接：${input.source_url}` : '',
+  ].filter(Boolean)
+
+  const content = await retryWithBackoff(async () =>
+    requestChatCompletion({
+      messages: [
+        { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
+        { role: 'user', content: promptLines.join('\n') },
+      ],
+      max_tokens: 200,
+      model: OPENAI_TEXT_MODEL,
+    })
+  )
+  if (!content) {
+    throw new Error('No content returned from AI')
+  }
+
+  try {
+    const result = parseJsonFromAi<{ taste?: unknown; summary?: unknown }>(content)
+    return {
+      taste: typeof result.taste === 'string' ? result.taste.trim() : '风格未知',
+      summary: typeof result.summary === 'string' ? result.summary.trim() : '',
+    }
+  } catch (error) {
+    console.error('Failed to parse AI summary response:', content)
+    throw new Error('Failed to parse AI response as JSON')
+  }
+}
+
+export default { extractFromImage, extractFromText, generateTasteSummary }
 
 type AiExtractionResult = {
   name: string
   address_text?: string
+  taste?: string
   price?: number
   rating?: number
   dishes?: string[]

@@ -5,11 +5,13 @@ const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || 'gourmetlog-images';
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
+const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
 
 // R2 endpoint for Cloudflare
 const R2_ENDPOINT = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
 
 const UPLOAD_TIMEOUT = 30000; // 30 seconds
+const DOWNLOAD_TIMEOUT = 30000; // 30 seconds
 
 /**
  * Check if R2 is configured
@@ -22,29 +24,33 @@ function isR2Configured(): boolean {
   );
 }
 
-/**
- * Generate AWS Signature v4
- * Simplified implementation for Bun compatibility
- */
-function generateSignature(
-  method: string,
-  path: string,
-  date: string,
-  region: string
-): string {
-  // Simplified HMAC-SHA256 implementation
-  const crypto = require('crypto');
-  const key = crypto.createHmac('sha256', R2_SECRET_ACCESS_KEY || '');
-  const dateKey = crypto.createHmac('sha256', `AWS4${R2_SECRET_ACCESS_KEY}`).update(date).digest();
-  const regionKey = crypto.createHmac('sha256', dateKey).update(region).digest();
-  const serviceKey = crypto.createHmac('sha256', regionKey).update('s3').digest();
-  const signingKey = crypto.createHmac('sha256', serviceKey).update('aws4_request').digest();
+function getAmzDates(date: Date): { amzDate: string; dateStamp: string } {
+  const iso = date.toISOString().replace(/[:-]|\.\d{3}/g, '')
+  return {
+    amzDate: iso,
+    dateStamp: iso.slice(0, 8),
+  }
+}
 
-  const canonicalRequest = `${method}\n${path}\n\nhost:${R2_ACCOUNT_ID}.r2.cloudflarestorage.com\n\n`;
-  const hashedRequest = crypto.createHash('sha256').update(canonicalRequest).digest('hex');
+function sha256Hex(data: Buffer | string): string {
+  const crypto = require('crypto')
+  return crypto.createHash('sha256').update(data).digest('hex')
+}
 
-  const stringToSign = `AWS4-HMAC-SHA256\n${date}\n${region}/s3/aws4_request\n${hashedRequest}`;
-  return crypto.createHmac('sha256', signingKey).update(stringToSign).digest('hex');
+function hmacSha256(key: Buffer | string, data: string): Buffer {
+  const crypto = require('crypto')
+  return crypto.createHmac('sha256', key).update(data).digest()
+}
+
+function getSignatureKey(secret: string, dateStamp: string, region: string): Buffer {
+  const kDate = hmacSha256(`AWS4${secret}`, dateStamp)
+  const kRegion = hmacSha256(kDate, region)
+  const kService = hmacSha256(kRegion, 's3')
+  return hmacSha256(kService, 'aws4_request')
+}
+
+function encodeKey(key: string): string {
+  return key.split('/').map(encodeURIComponent).join('/')
 }
 
 /**
@@ -53,7 +59,8 @@ function generateSignature(
  */
 export async function uploadImage(file: File): Promise<R2UploadResult> {
   const timestamp = Date.now();
-  const filename = `spots/${timestamp}-${file.name}`;
+  const objectKey = `spots/${timestamp}-${file.name}`;
+  const encodedKey = encodeKey(objectKey);
 
   // Fallback: Convert to Base64 if R2 is not configured
   if (!isR2Configured()) {
@@ -66,33 +73,80 @@ export async function uploadImage(file: File): Promise<R2UploadResult> {
     };
   }
 
-  console.log(`📤 Uploading to R2: ${filename}...`);
+  console.log(`📤 Uploading to R2: ${objectKey}...`);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT);
 
   try {
-    // For simplicity in this MVP, use direct upload via fetch
-    // In production, you'd want to use AWS SDK or proper signature generation
-    // This is a simplified implementation that may need R2 presigned URLs
+    const host = `${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
+    const url = `${R2_ENDPOINT}/${R2_BUCKET_NAME}/${encodedKey}`;
 
-    const formData = new FormData();
-    formData.append('file', file);
+    const arrayBuffer = await file.arrayBuffer();
+    const payload = Buffer.from(arrayBuffer);
+    const payloadHash = sha256Hex(payload);
 
-    // Note: This is a simplified approach. Real R2 integration requires:
-    // 1. AWS SDK (not ideal for 100MB memory)
-    // 2. Or presigned URLs generated on server
-    // 3. Or direct S3-compatible API with proper signatures
+    const { amzDate, dateStamp } = getAmzDates(new Date());
+    const region = 'auto';
 
-    // For now, we'll return a placeholder and document this limitation
-    console.warn('⚠️ R2 upload not fully implemented, using placeholder');
+    const canonicalUri = `/${R2_BUCKET_NAME}/${encodedKey}`;
+    const canonicalHeaders =
+      `host:${host}\n` +
+      `x-amz-content-sha256:${payloadHash}\n` +
+      `x-amz-date:${amzDate}\n`;
+    const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
+    const canonicalRequest = [
+      'PUT',
+      canonicalUri,
+      '',
+      canonicalHeaders,
+      signedHeaders,
+      payloadHash,
+    ].join('\n');
+
+    const stringToSign = [
+      'AWS4-HMAC-SHA256',
+      amzDate,
+      `${dateStamp}/${region}/s3/aws4_request`,
+      sha256Hex(canonicalRequest),
+    ].join('\n');
+
+    const signingKey = getSignatureKey(R2_SECRET_ACCESS_KEY || '', dateStamp, region);
+    const signature = hmacSha256(signingKey, stringToSign).toString('hex');
+
+    const authorization = [
+      'AWS4-HMAC-SHA256 Credential=' +
+        `${R2_ACCESS_KEY_ID}/${dateStamp}/${region}/s3/aws4_request`,
+      `SignedHeaders=${signedHeaders}`,
+      `Signature=${signature}`,
+    ].join(', ');
+
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': file.type || 'application/octet-stream',
+        'x-amz-content-sha256': payloadHash,
+        'x-amz-date': amzDate,
+        Authorization: authorization,
+      },
+      body: payload,
+      signal: controller.signal,
+    });
 
     clearTimeout(timeoutId);
 
-    // Return mock result for MVP (to be replaced with proper R2 integration)
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`R2 upload failed: ${response.status} ${errorText}`);
+    }
+
+    const publicBase = R2_PUBLIC_URL
+      ? R2_PUBLIC_URL.replace(/\/$/, '')
+      : `https://${R2_BUCKET_NAME}.${R2_ACCOUNT_ID}.r2.dev`;
+
     return {
-      key: filename,
-      url: `https://pub-${R2_ACCOUNT_ID}.r2.dev/${R2_BUCKET_NAME}/${filename}`,
+      key: objectKey,
+      url: `${publicBase}/${encodedKey}`,
       isBase64: false,
     };
   } catch (error: unknown) {
@@ -103,7 +157,86 @@ export async function uploadImage(file: File): Promise<R2UploadResult> {
     }
 
     console.error('R2 upload error:', error);
-    throw error;
+    if (!isR2Configured()) {
+      const base64 = await fileToBase64(file);
+      return {
+        key: '',
+        url: `data:${file.type};base64,${base64}`,
+        isBase64: true,
+      };
+    }
+
+    throw error instanceof Error ? error : new Error('R2 upload failed');
+  }
+}
+
+/**
+ * Fetch object from R2 (private bucket supported via signed request)
+ */
+export async function getObject(objectKey: string): Promise<Response> {
+  if (!isR2Configured()) {
+    return new Response('R2 not configured', { status: 400 })
+  }
+
+  const encodedKey = encodeKey(objectKey)
+  const host = `${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
+  const url = `${R2_ENDPOINT}/${R2_BUCKET_NAME}/${encodedKey}`
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT)
+
+  try {
+    const payloadHash = sha256Hex('')
+    const { amzDate, dateStamp } = getAmzDates(new Date())
+    const region = 'auto'
+
+    const canonicalUri = `/${R2_BUCKET_NAME}/${encodedKey}`
+    const canonicalHeaders =
+      `host:${host}\n` +
+      `x-amz-content-sha256:${payloadHash}\n` +
+      `x-amz-date:${amzDate}\n`
+    const signedHeaders = 'host;x-amz-content-sha256;x-amz-date'
+    const canonicalRequest = [
+      'GET',
+      canonicalUri,
+      '',
+      canonicalHeaders,
+      signedHeaders,
+      payloadHash,
+    ].join('\n')
+
+    const stringToSign = [
+      'AWS4-HMAC-SHA256',
+      amzDate,
+      `${dateStamp}/${region}/s3/aws4_request`,
+      sha256Hex(canonicalRequest),
+    ].join('\n')
+
+    const signingKey = getSignatureKey(R2_SECRET_ACCESS_KEY || '', dateStamp, region)
+    const signature = hmacSha256(signingKey, stringToSign).toString('hex')
+    const authorization = [
+      'AWS4-HMAC-SHA256 Credential=' +
+        `${R2_ACCESS_KEY_ID}/${dateStamp}/${region}/s3/aws4_request`,
+      `SignedHeaders=${signedHeaders}`,
+      `Signature=${signature}`,
+    ].join(', ')
+
+    return await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-amz-content-sha256': payloadHash,
+        'x-amz-date': amzDate,
+        Authorization: authorization,
+      },
+      signal: controller.signal,
+    })
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('R2 download timeout')
+    }
+    throw error instanceof Error ? error : new Error('R2 download failed')
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 
@@ -134,7 +267,7 @@ export function getR2Url(key: string): string {
   return `https://pub-${R2_ACCOUNT_ID}.r2.dev/${R2_BUCKET_NAME}/${key}`;
 }
 
-export default { uploadImage, getR2Url, isR2Configured };
+export default { uploadImage, getObject, getR2Url, isR2Configured };
 
 // Types
 type R2UploadResult = {
