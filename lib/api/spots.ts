@@ -134,6 +134,32 @@ export async function reverseGeocode(
   return response.data
 }
 
+export async function ipLocate(): Promise<{
+  province?: string
+  city?: string
+  adcode?: string
+  rectangle?: string
+  center?: { lat: number; lng: number }
+}> {
+  const response = await apiClient.get<{
+    success: boolean
+    data?: {
+      province?: string
+      city?: string
+      adcode?: string
+      rectangle?: string
+      center?: { lat: number; lng: number }
+    }
+    error?: string
+  }>('/api/ai/iploc')
+
+  if (!response.success || !response.data) {
+    throw new Error(response.error || 'IP locate failed')
+  }
+
+  return response.data
+}
+
 /**
  * Upload image to R2
  */

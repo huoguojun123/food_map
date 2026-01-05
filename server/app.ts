@@ -4,7 +4,7 @@
 import { initializeDatabase } from './db/d1.js';
 import { handleCreateSpot, handleListSpots, handleGetSpot, handleUpdateSpot, handleDeleteSpot } from './api/spots.js';
 import { handleAiExtract, handleAiPlan } from './api/ai.js';
-import { handleGeocode, handleReverseGeocode } from './api/geocode.js';
+import { handleGeocode, handleIpLocate, handleReverseGeocode } from './api/geocode.js';
 import { handleImageProxy } from './api/images.js';
 import { handleUpload } from './api/upload.js';
 import { handleSettings, handleSettingsTest } from './api/settings.js';
@@ -63,6 +63,13 @@ registerRoute('/api/ai/geocode', async (req, url) => {
 registerRoute('/api/ai/regeo', async (req, url) => {
   if (req.method === 'POST') {
     return handleReverseGeocode(req);
+  }
+  return Response.json({ error: 'Method not allowed' }, { status: 405 });
+});
+
+registerRoute('/api/ai/iploc', async (req, url) => {
+  if (req.method === 'GET') {
+    return handleIpLocate(req);
   }
   return Response.json({ error: 'Method not allowed' }, { status: 405 });
 });

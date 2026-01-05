@@ -5,38 +5,41 @@ import type { FoodSpot } from '@/lib/types/index'
 import { listSpots } from '@/lib/api/spots'
 import { createPlan } from '@/lib/api/plans'
 import { generateAiPlan } from '@/lib/api/ai'
-import { geocodeAddress, reverseGeocode } from '@/lib/api/spots'
+import { geocodeAddress, ipLocate, reverseGeocode } from '@/lib/api/spots'
 
-/**
- * AI 规划页面
- * 特性：
- * - 可输入自然语句（如“到开封书店街了”）自动提取地点并定位
- * - 可手动输入位置、匹配候选、获取当前定位
- * - 不勾选餐厅时默认使用“当前位置 + 半径”筛选出的餐厅并按距离排序
- * - 勾选餐厅则仅使用勾选集合
- * - 保存计划时写入 origin_text / origin_lat / origin_lng / radius_km
- */
+type OriginSource = 'intent' | 'manual' | 'geo' | 'ip' | null
+
 export default function AiPlannerPage() {
   const [spots, setSpots] = useState<FoodSpot[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
+
   const [intent, setIntent] = useState('')
   const [planTitle, setPlanTitle] = useState('')
   const [planSummary, setPlanSummary] = useState('')
   const [planOrder, setPlanOrder] = useState<number[] | null>(null)
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   const [originText, setOriginText] = useState('')
   const [originCandidates, setOriginCandidates] = useState<
     Array<{ formatted_address: string; lat: number; lng: number; city?: string; district?: string }>
   >([])
   const [originLocation, setOriginLocation] = useState<{ lat: number; lng: number } | null>(null)
-  const [isMatchingOrigin, setIsMatchingOrigin] = useState(false)
+  const [originSource, setOriginSource] = useState<OriginSource>(null)
+  const [geoAccuracyM, setGeoAccuracyM] = useState<number | null>(null)
   const [radiusKm, setRadiusKm] = useState('6')
 
-  // 加载餐厅
+  const [ipHint, setIpHint] = useState<{
+    city?: string
+    province?: string
+    center?: { lat: number; lng: number }
+  } | null>(null)
+
+  const [isMatchingOrigin, setIsMatchingOrigin] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+
+  // 1) 加载餐厅
   useEffect(() => {
     const load = async () => {
       try {
@@ -49,33 +52,53 @@ export default function AiPlannerPage() {
     load()
   }, [])
 
-  // 自动尝试从需求中提取地点并定位（如果还未定位、且用户未手动输入位置）
+  // 2) 预加载 IP 定位（只做兜底，不强制使用）
   useEffect(() => {
-    if (originLocation) return
-    if (originText.trim().length > 0) return
+    const loadIp = async () => {
+      try {
+        const result = await ipLocate()
+        setIpHint({ city: result.city, province: result.province, center: result.center })
+      } catch {
+        // ignore
+      }
+    }
+    loadIp()
+  }, [])
+
+  // 3) 从“规划需求”自动提取地点并定位（不需要你手动填位置）
+  useEffect(() => {
+    const hint = extractLocationHint(intent)
+    if (!hint) return
+    if (originSource === 'manual') return
+
+    // 如果已经是需求定位且同一地点就不重复跑
+    if (originSource === 'intent' && originText.trim().includes(hint)) return
 
     void autoGeocode({
-      originText: '',
-      intent,
-      geocode: geocodeAddress,
+      query: hint,
+      cityHint: extractCityHint(hint) || ipHint?.city,
+      reason: 'intent',
       setOriginLocation,
       setOriginText,
       setOriginCandidates,
+      setOriginSource,
       setIsMatchingOrigin,
       setError,
-      reason: 'intent-change',
     })
-  }, [intent]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [intent, ipHint?.city]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedSpots = useMemo(
     () => spots.filter(spot => selectedIds.includes(spot.id)),
     [spots, selectedIds]
   )
 
+  // “附近”筛选：必须依赖一个可信 originLocation
   const filteredSpots = useMemo(() => {
     if (!originLocation) return spots
+
     const radius = Number(radiusKm)
     const effectiveRadius = Number.isFinite(radius) && radius > 0 ? radius : null
+
     return spots
       .map(spot => ({
         spot,
@@ -99,33 +122,135 @@ export default function AiPlannerPage() {
     return [...ordered, ...missing]
   }, [autoSpots, planOrder])
 
+  const selectionNote =
+    selectedSpots.length > 0
+      ? `已手动选择 ${selectedSpots.length} 家`
+      : originLocation
+        ? `未选择时默认使用附近 ${filteredSpots.length} 家`
+        : `未定位时默认使用全部 ${spots.length} 家`
+
   const toggleSpot = (id: number) => {
     setSelectedIds(prev => (prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]))
   }
 
-  const ensureOrigin = async (): Promise<boolean> => {
-    if (originLocation) return true
-    return await autoGeocode({
-      originText,
-      intent,
-      geocode: geocodeAddress,
+  const handleMatchOrigin = async () => {
+    const value = originText.trim()
+    if (!value) {
+      setError('请先填写位置，或直接在规划需求里写“到XX了”')
+      return
+    }
+
+    // 输入是坐标则直接使用，不走高德匹配（避免“当前/坐标”被当作关键词）
+    const coord = parseCoordinates(value)
+    if (coord) {
+      setOriginCandidates([])
+      setOriginLocation(coord)
+      setOriginSource('manual')
+      return
+    }
+
+    await autoGeocode({
+      query: value,
+      cityHint: extractCityHint(value) || ipHint?.city,
+      reason: 'manual',
       setOriginLocation,
       setOriginText,
       setOriginCandidates,
+      setOriginSource,
       setIsMatchingOrigin,
       setError,
-      reason: 'auto-ensure',
     })
   }
 
-  const handleGenerate = async () => {
-    const ensured = await ensureOrigin()
-    if (!ensured && spots.length === 0) {
-      setError('暂无可规划的餐厅记录')
+  const applyOriginCandidate = (candidate: { formatted_address: string; lat: number; lng: number }) => {
+    setOriginLocation({ lat: candidate.lat, lng: candidate.lng })
+    setOriginText(candidate.formatted_address)
+    setOriginCandidates([])
+    setOriginSource('manual')
+  }
+
+  // 浏览器定位：只在精度合理时作为“附近筛选”的 origin；否则自动降级到 IP 城市中心
+  const handleGeoLocate = async () => {
+    if (!navigator.geolocation) {
+      setError('浏览器不支持定位')
       return
     }
+
+    setIsMatchingOrigin(true)
+    setError(null)
+
+    navigator.geolocation.getCurrentPosition(
+      async pos => {
+        const { latitude, longitude, accuracy } = pos.coords
+        setGeoAccuracyM(Number.isFinite(accuracy) ? accuracy : null)
+
+        // 精度过大（>8km）时，直接认为“定位不可靠”，降级到 IP 定位
+        if (Number.isFinite(accuracy) && accuracy > 8000) {
+          await handleIpLocate()
+          setIsMatchingOrigin(false)
+          return
+        }
+
+        setOriginLocation({ lat: latitude, lng: longitude })
+        setOriginSource('geo')
+        setOriginCandidates([])
+
+        try {
+          const info = await reverseGeocode(latitude, longitude)
+          setOriginText(info.formatted_address || '')
+        } catch {
+          setOriginText('')
+        } finally {
+          setIsMatchingOrigin(false)
+        }
+
+        // 如果需求里明确提到某地（如“开封”），则需求优先覆盖“当前定位”
+        const hint = extractLocationHint(intent)
+        if (hint) {
+          void autoGeocode({
+            query: hint,
+            cityHint: extractCityHint(hint) || ipHint?.city,
+            reason: 'intent',
+            setOriginLocation,
+            setOriginText,
+            setOriginCandidates,
+            setOriginSource,
+            setIsMatchingOrigin,
+            setError,
+          })
+        }
+      },
+      async err => {
+        // 定位失败直接用 IP 定位兜底
+        await handleIpLocate()
+        setIsMatchingOrigin(false)
+        if (!originLocation) {
+          setError(err.message || '定位失败')
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+    )
+  }
+
+  const handleIpLocate = async () => {
+    try {
+      const result = await ipLocate()
+      if (result.center) {
+        setOriginLocation({ lat: result.center.lat, lng: result.center.lng })
+        setOriginText(result.city || result.province || '')
+        setOriginCandidates([])
+        setOriginSource('ip')
+      } else {
+        setError('IP 定位不可用')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'IP 定位失败')
+    }
+  }
+
+  const handleGenerate = async () => {
     if (autoSpots.length === 0) {
-      setError('暂无可规划的餐厅记录')
+      setError('没有可用于规划的餐厅')
       return
     }
 
@@ -158,13 +283,8 @@ export default function AiPlannerPage() {
   }
 
   const handleSave = async () => {
-    const ensured = await ensureOrigin()
-    if (!ensured && spots.length === 0) {
-      setError('暂无可保存的餐厅记录')
-      return
-    }
     if (autoSpots.length === 0) {
-      setError('暂无可保存的餐厅记录')
+      setError('没有可保存的餐厅')
       return
     }
 
@@ -194,69 +314,13 @@ export default function AiPlannerPage() {
     }
   }
 
-  const selectionNote =
-    selectedSpots.length > 0
-      ? `已手动选择 ${selectedSpots.length} 家`
-      : originLocation
-        ? `未选择时默认使用附近 ${filteredSpots.length} 家`
-        : `未选择时默认使用全部 ${spots.length} 家`
-
-  const handleMatchOrigin = async () => {
-    setError(null)
-    await autoGeocode({
-      originText,
-      intent,
-      geocode: geocodeAddress,
-      setOriginLocation,
-      setOriginText,
-      setOriginCandidates,
-      setIsMatchingOrigin,
-      setError,
-      reason: 'manual',
-    })
-  }
-
-  const applyOriginCandidate = (candidate: { formatted_address: string; lat: number; lng: number }) => {
-    setOriginLocation({ lat: candidate.lat, lng: candidate.lng })
-    setOriginText(candidate.formatted_address)
-    setOriginCandidates([])
-  }
-
-  const handleGeoLocate = () => {
-    if (!navigator.geolocation) {
-      setError('浏览器不支持定位')
-      return
-    }
-    setIsMatchingOrigin(true)
-    navigator.geolocation.getCurrentPosition(
-      async pos => {
-        const { latitude, longitude } = pos.coords
-        setOriginLocation({ lat: latitude, lng: longitude })
-        setOriginCandidates([])
-
-        try {
-          const info = await reverseGeocode(latitude, longitude)
-          setOriginText(info.formatted_address || '')
-        } catch {
-          setOriginText('')
-        } finally {
-          setIsMatchingOrigin(false)
-        }
-      },
-      err => {
-        setIsMatchingOrigin(false)
-        setError(err.message || '定位失败')
-      }
-    )
-  }
-
   return (
     <div className="min-h-screen pb-24">
       <header className="sticky top-0 z-40 backdrop-blur-lg bg-white/70 border-b border-orange-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-display text-zinc-900">AI 规划</h1>
-            <p className="text-sm text-zinc-600">生成推荐与路线，保存到旅途规划</p>
+            <p className="text-sm text-zinc-600">结合地点与餐厅地址，生成就近规划</p>
           </div>
           <a
             href="/"
@@ -274,7 +338,7 @@ export default function AiPlannerPage() {
             <textarea
               value={intent}
               onChange={e => setIntent(e.target.value)}
-              placeholder="例如：到开封书店街了，想找 3km 内适合两人小聚的店"
+              placeholder="例如：到开封书店街了，找 3km 内适合两人小聚的店"
               rows={3}
               className="mag-input w-full px-5 py-4 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-200 bg-white resize-none"
             />
@@ -310,7 +374,7 @@ export default function AiPlannerPage() {
                 type="text"
                 value={originText}
                 onChange={e => setOriginText(e.target.value)}
-                placeholder="输入当前位置或旅途地点（例如：开封书店街、高新区雪松路）"
+                placeholder="可不填；也可输入“开封书店街”或粘贴坐标"
                 className="mag-input w-full px-5 py-3 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-200 bg-white"
               />
               <div className="flex flex-wrap items-center gap-3">
@@ -325,9 +389,18 @@ export default function AiPlannerPage() {
                 <button
                   type="button"
                   onClick={handleGeoLocate}
-                  className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 text-sm hover:bg-orange-50"
+                  disabled={isMatchingOrigin}
+                  className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 text-sm hover:bg-orange-50 disabled:opacity-60"
                 >
                   获取当前定位
+                </button>
+                <button
+                  type="button"
+                  onClick={handleIpLocate}
+                  disabled={isMatchingOrigin}
+                  className="px-4 py-2 rounded-full border border-orange-200 text-orange-600 text-sm hover:bg-orange-50 disabled:opacity-60"
+                >
+                  使用 IP 定位
                 </button>
                 <div className="flex items-center gap-2 text-sm text-zinc-500">
                   <span>半径</span>
@@ -342,18 +415,24 @@ export default function AiPlannerPage() {
                 </div>
               </div>
               <p className="text-xs text-zinc-500">
-                可直接输入“到开封书店街了”，我会自动解析位置；留空则使用全部餐厅。
+                需求里写“到XX了/在XX附近”会自动定位并覆盖“当前定位”。你也可以直接点 IP 定位作为城市级兜底。
               </p>
             </div>
             {originLocation && (
-              <div className="rounded-2xl border border-orange-100 bg-orange-50/60 px-4 py-3 text-xs text-zinc-600">
-                已定位：{originLocation.lat.toFixed(5)}, {originLocation.lng.toFixed(5)}
+              <div className="rounded-2xl border border-orange-100 bg-orange-50/60 px-4 py-3 text-xs text-zinc-600 space-y-1">
+                <div>
+                  已定位：{originLocation.lat.toFixed(5)}, {originLocation.lng.toFixed(5)}
+                </div>
+                <div>来源：{originSource || '未知'}</div>
+                {originSource === 'geo' && geoAccuracyM !== null && (
+                  <div>精度：约 {Math.round(geoAccuracyM)} m</div>
+                )}
               </div>
             )}
           </div>
           {originCandidates.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs text-zinc-500">请选择最准确的位置</p>
+              <p className="text-xs text-zinc-500">请选择最准确的位置（手动选一次即可）</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {originCandidates.slice(0, 6).map(candidate => (
                   <button
@@ -436,25 +515,71 @@ export default function AiPlannerPage() {
   )
 }
 
-function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const toRad = (value: number) => (value * Math.PI) / 180
-  const R = 6371
-  const dLat = toRad(lat2 - lat1)
-  const dLng = toRad(lng2 - lng1)
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return R * c
+async function autoGeocode(opts: {
+  query: string
+  cityHint?: string
+  reason: OriginSource
+  setOriginLocation: (loc: { lat: number; lng: number }) => void
+  setOriginText: (value: string) => void
+  setOriginCandidates: (value: any[]) => void
+  setOriginSource: (value: OriginSource) => void
+  setIsMatchingOrigin: (value: boolean) => void
+  setError: (value: string | null) => void
+}): Promise<boolean> {
+  const {
+    query,
+    cityHint,
+    reason,
+    setOriginLocation,
+    setOriginText,
+    setOriginCandidates,
+    setOriginSource,
+    setIsMatchingOrigin,
+    setError,
+  } = opts
+
+  const trimmed = query.trim()
+  if (!trimmed) return false
+
+  // 坐标输入：直接使用
+  const coord = parseCoordinates(trimmed)
+  if (coord) {
+    setOriginLocation(coord)
+    setOriginCandidates([])
+    setOriginText('')
+    setOriginSource(reason)
+    return true
+  }
+
+  setIsMatchingOrigin(true)
+  setError(null)
+  setOriginCandidates([])
+
+  try {
+    const result = await geocodeAddress(trimmed, cityHint)
+    const candidates = result.candidates || []
+    setOriginCandidates(candidates)
+
+    if (candidates.length > 0) {
+      const first = candidates[0]
+      setOriginLocation({ lat: first.lat, lng: first.lng })
+      setOriginText(first.formatted_address)
+      setOriginSource(reason)
+      return true
+    }
+  } catch (err) {
+    setError(err instanceof Error ? err.message : '位置匹配失败')
+  } finally {
+    setIsMatchingOrigin(false)
+  }
+
+  return false
 }
 
-function extractLocationHint(intent: string, originText: string): string | null {
-  const merged = (originText || intent || '').trim()
+function extractLocationHint(intent: string): string | null {
+  const merged = intent.trim()
   if (!merged) return null
-  // 过滤明显的“坐标字符串/当前定位”输入，避免当作关键词去高德匹配
-  if (isLikelyCoordinateText(merged)) {
-    return null
-  }
+
   const patterns = [
     /到([^，。!.]+?)了/,
     /在([^，。!.]+?)附近/,
@@ -466,74 +591,32 @@ function extractLocationHint(intent: string, originText: string): string | null 
     const m = merged.match(p)
     if (m && m[1]) return m[1].trim()
   }
-  return merged
+
+  return null
 }
 
-function isLikelyCoordinateText(value: string): boolean {
+function extractCityHint(value: string): string | undefined {
   const trimmed = value.trim()
-  if (!trimmed) return false
-  if (trimmed.startsWith('当前定位') || trimmed.startsWith('已定位')) {
-    return true
-  }
-  return Boolean(trimmed.match(/-?\d{1,3}\.\d+,\s*-?\d{1,3}\.\d+/))
-}
+  if (!trimmed) return undefined
 
-async function autoGeocode(opts: {
-  originText: string
-  intent: string
-  geocode: typeof geocodeAddress
-  setOriginLocation: (loc: { lat: number; lng: number }) => void
-  setOriginText: (value: string) => void
-  setOriginCandidates: (value: any[]) => void
-  setIsMatchingOrigin: (value: boolean) => void
-  setError: (value: string | null) => void
-  reason?: string
-}): Promise<boolean> {
-  const {
-    originText,
-    intent,
-    geocode,
-    setOriginLocation,
-    setOriginText,
-    setOriginCandidates,
-    setIsMatchingOrigin,
-    setError,
-  } = opts
-  // 如果输入里已经包含可解析的坐标，直接用坐标，不走高德匹配，避免“当前/坐标”导致跨省
-  const coordinate = parseCoordinates(originText) ?? parseCoordinates(intent)
-  if (coordinate) {
-    setOriginLocation({ lat: coordinate.lat, lng: coordinate.lng })
-    setOriginCandidates([])
-    setOriginText('')
-    return true
+  const cityMatch = trimmed.match(/([\u4e00-\u9fa5]{2,8}市)/)
+  if (cityMatch?.[1]) {
+    return cityMatch[1]
   }
 
-  const hint = extractLocationHint(intent, originText)
-  if (!hint) return false
-  setIsMatchingOrigin(true)
-  setError(null)
-  setOriginCandidates([])
-  try {
-    const result = await geocode(hint)
-    const candidates = result.candidates || []
-    setOriginCandidates(candidates)
-    if (candidates.length > 0) {
-      const candidate = candidates[0]
-      setOriginLocation({ lat: candidate.lat, lng: candidate.lng })
-      setOriginText(candidate.formatted_address)
-      return true
-    }
-  } catch (err) {
-    setError(err instanceof Error ? err.message : '位置匹配失败')
-  } finally {
-    setIsMatchingOrigin(false)
+  // “开封书店街 / 郑州高新区雪松路”这类：取开头 2~3 字作为 cityHint（仅在后续出现街/路/区/县等时启用）
+  const prefixMatch = trimmed.match(/^([\u4e00-\u9fa5]{2,3}).{0,6}(街|路|区|县|镇|乡|大道|高新区|新区)/)
+  if (prefixMatch?.[1]) {
+    return prefixMatch[1]
   }
-  return false
+
+  return undefined
 }
 
 function parseCoordinates(value: string): { lat: number; lng: number } | null {
   const trimmed = value.trim()
   if (!trimmed) return null
+  if (trimmed.startsWith('当前定位') || trimmed.startsWith('已定位')) return null
 
   const match = trimmed.match(/(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/)
   if (!match) return null
@@ -541,11 +624,21 @@ function parseCoordinates(value: string): { lat: number; lng: number } | null {
   const b = Number(match[2])
   if (!Number.isFinite(a) || !Number.isFinite(b)) return null
 
-  // 常见写法：lat,lng 或 lng,lat 都可能；根据范围做判断
   const looksLikeLatLng = Math.abs(a) <= 90 && Math.abs(b) <= 180
   const looksLikeLngLat = Math.abs(a) <= 180 && Math.abs(b) <= 90
   if (looksLikeLatLng && !looksLikeLngLat) return { lat: a, lng: b }
   if (looksLikeLngLat && !looksLikeLatLng) return { lat: b, lng: a }
-  // 两种都可能时默认按 lat,lng
   return { lat: a, lng: b }
+}
+
+function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (value: number) => (value * Math.PI) / 180
+  const R = 6371
+  const dLat = toRad(lat2 - lat1)
+  const dLng = toRad(lng2 - lng1)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
 }

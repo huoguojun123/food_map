@@ -1,7 +1,7 @@
 // Geocoding API endpoint
 // Converts address text to coordinates using AMap
 
-import { geocodeCandidates, reverseGeocode } from '../services/amap.js';
+import { geocodeCandidates, ipLocate, reverseGeocode } from '../services/amap.js';
 
 /**
  * Handle POST /api/ai/geocode - Convert address to coordinates
@@ -68,6 +68,24 @@ export async function handleReverseGeocode(req: Request): Promise<Response> {
     console.error('Error in reverse geocode:', error)
     return Response.json(
       { success: false, error: error instanceof Error ? error.message : 'Reverse geocoding failed' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function handleIpLocate(req: Request): Promise<Response> {
+  try {
+    const forwarded = req.headers.get('x-forwarded-for') || ''
+    const cfIp = req.headers.get('cf-connecting-ip') || ''
+    const raw = (forwarded.split(',')[0] || cfIp).trim()
+    const ip = raw && raw !== '::1' ? raw : undefined
+
+    const result = await ipLocate(ip)
+    return Response.json({ success: true, data: result })
+  } catch (error: unknown) {
+    console.error('Error in ip locate:', error)
+    return Response.json(
+      { success: false, error: error instanceof Error ? error.message : 'IP locate failed' },
       { status: 500 }
     )
   }

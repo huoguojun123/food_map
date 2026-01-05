@@ -6,6 +6,7 @@ const AMAP_GEOCODE_URL = 'https://restapi.amap.com/v3/geocode/geo'
 const AMAP_PLACE_URL = 'https://restapi.amap.com/v3/place/text'
 const AMAP_INPUT_TIPS_URL = 'https://restapi.amap.com/v3/assistant/inputtips'
 const AMAP_REVERSE_GEOCODE_URL = 'https://restapi.amap.com/v3/geocode/regeo'
+const AMAP_IP_LOCATION_URL = 'https://restapi.amap.com/v3/ip'
 
 const API_TIMEOUT = 5000
 const CACHE_TTL = 24 * 60 * 60 * 1000
@@ -203,7 +204,68 @@ export async function reverseGeocode(
   }
 }
 
-export default { geocode, geocodeCandidates, reverseGeocode }
+export async function ipLocate(ip?: string): Promise<{
+  province?: string
+  city?: string
+  adcode?: string
+  rectangle?: string
+  center?: { lat: number; lng: number }
+}> {
+  if (!AMAP_KEY) {
+    throw new Error('AMAP_KEY environment variable is not set')
+  }
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+
+  try {
+    const params = new URLSearchParams({ key: AMAP_KEY })
+    if (ip) {
+      params.set('ip', ip)
+    }
+    const url = `${AMAP_IP_LOCATION_URL}?${params.toString()}`
+    const response = await fetch(url, { signal: controller.signal })
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      throw new Error(`AMap API error: ${response.status}`)
+    }
+
+    const data = (await response.json()) as AMapIpResponse
+    if (data.status !== '1') {
+      throw new Error(`AMap ip location failed: ${data.info}`)
+    }
+
+    const rectangle = typeof data.rectangle === 'string' ? data.rectangle : undefined
+    const center = rectangle ? rectangleCenter(rectangle) : undefined
+
+    return {
+      province: data.province || undefined,
+      city: typeof data.city === 'string' ? data.city : Array.isArray(data.city) ? data.city[0] : undefined,
+      adcode: data.adcode || undefined,
+      rectangle,
+      center,
+    }
+  } catch (error: unknown) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('IP location request timeout')
+    }
+    throw error
+  }
+}
+
+export default { geocode, geocodeCandidates, reverseGeocode, ipLocate }
+
+function rectangleCenter(rectangle: string): { lat: number; lng: number } | undefined {
+  // rectangle: "lng1,lat1;lng2,lat2"
+  const parts = rectangle.split(';')
+  if (parts.length !== 2) return undefined
+  const [aLng, aLat] = parts[0].split(',').map(Number)
+  const [bLng, bLat] = parts[1].split(',').map(Number)
+  if (![aLng, aLat, bLng, bLat].every(Number.isFinite)) return undefined
+  return { lng: (aLng + bLng) / 2, lat: (aLat + bLat) / 2 }
+}
 
 async function searchPlaceCandidates(query: string, city?: string): Promise<GeocodingResult[]> {
   const controller = new AbortController()
@@ -411,6 +473,15 @@ type AMapReverseResponse = {
       adcode?: string
     }
   }
+}
+
+type AMapIpResponse = {
+  status: string
+  info: string
+  province?: string
+  city?: string | string[]
+  adcode?: string
+  rectangle?: string
 }
 
 type GeocodingResult = {
