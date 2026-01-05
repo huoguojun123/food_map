@@ -38,13 +38,26 @@ export async function handleAiExtract(req: Request): Promise<Response> {
         );
       }
 
-      const result = await extractFromImage(body.image);
-      const merged = applyExtractionFallback(result, undefined);
-      console.log('[AI] /api/ai/extract image done')
-      return Response.json({
-        success: true,
-        data: merged,
-      });
+      try {
+        const result = await extractFromImage(body.image);
+        const merged = applyExtractionFallback(result, undefined);
+        console.log('[AI] /api/ai/extract image done')
+        return Response.json({
+          success: true,
+          data: merged,
+        });
+      } catch (error) {
+        console.error('Image extraction failed, using fallback:', error)
+        const fallback = applyExtractionFallback(
+          { name: '', address_text: '', taste: '', summary: '' },
+          undefined
+        )
+        return Response.json({
+          success: true,
+          data: fallback,
+          warning: 'AI image extraction failed, fallback applied',
+        })
+      }
     }
 
     // Handle text extraction
@@ -56,21 +69,34 @@ export async function handleAiExtract(req: Request): Promise<Response> {
         );
       }
 
-      const { nameHint, addressHint } = parseShareText(body.text);
-      const hintPrefix =
-        nameHint || addressHint
-          ? `已解析信息：${nameHint ? `店名=${nameHint}` : ''}${nameHint && addressHint ? '；' : ''}${
-              addressHint ? `地址=${addressHint}` : ''
-            }\n`
-          : '';
-      const enrichedText = `${hintPrefix}${body.text}`;
-      const result = await extractFromText(enrichedText);
-      const merged = applyExtractionFallback(result, body.text);
-      console.log('[AI] /api/ai/extract text done')
-      return Response.json({
-        success: true,
-        data: merged,
-      });
+      try {
+        const { nameHint, addressHint } = parseShareText(body.text);
+        const hintPrefix =
+          nameHint || addressHint
+            ? `已解析信息：${nameHint ? `店名=${nameHint}` : ''}${nameHint && addressHint ? '；' : ''}${
+                addressHint ? `地址=${addressHint}` : ''
+              }\n`
+            : '';
+        const enrichedText = `${hintPrefix}${body.text}`;
+        const result = await extractFromText(enrichedText);
+        const merged = applyExtractionFallback(result, body.text);
+        console.log('[AI] /api/ai/extract text done')
+        return Response.json({
+          success: true,
+          data: merged,
+        });
+      } catch (error) {
+        console.error('Text extraction failed, using fallback:', error)
+        const fallback = applyExtractionFallback(
+          { name: '', address_text: '', taste: '', summary: '' },
+          body.text
+        )
+        return Response.json({
+          success: true,
+          data: fallback,
+          warning: 'AI text extraction failed, fallback applied',
+        })
+      }
     }
 
     // Handle URL extraction
@@ -97,12 +123,26 @@ export async function handleAiExtract(req: Request): Promise<Response> {
         );
       }
 
-      const pageText = await fetchPageText(normalizedUrl);
-      const result = await extractFromText(pageText);
-      return Response.json({
-        success: true,
-        data: result,
-      });
+      try {
+        const pageText = await fetchPageText(normalizedUrl);
+        const result = await extractFromText(pageText);
+        const merged = applyExtractionFallback(result, pageText)
+        return Response.json({
+          success: true,
+          data: merged,
+        });
+      } catch (error) {
+        console.error('URL extraction failed, using fallback:', error)
+        const fallback = applyExtractionFallback(
+          { name: '', address_text: '', taste: '', summary: '' },
+          body.url
+        )
+        return Response.json({
+          success: true,
+          data: fallback,
+          warning: 'AI url extraction failed, fallback applied',
+        })
+      }
     }
 
     // Should not reach here
@@ -285,7 +325,9 @@ function applyExtractionFallback(
 function normalizeTaste(value?: string): string | null {
   if (!value) return null;
   const trimmed = value.trim();
-  if (!trimmed || trimmed === '风格未知' || trimmed === '未知') return null;
+  if (!trimmed || trimmed === '风格未知' || trimmed === '口味未知' || trimmed === '未知' || trimmed === '暂无') {
+    return null;
+  }
   return trimmed.length > 32 ? trimmed.slice(0, 32) : trimmed;
 }
 
