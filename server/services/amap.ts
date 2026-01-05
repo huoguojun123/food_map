@@ -4,6 +4,7 @@
 const AMAP_KEY = process.env.AMAP_KEY
 const AMAP_GEOCODE_URL = 'https://restapi.amap.com/v3/geocode/geo'
 const AMAP_PLACE_URL = 'https://restapi.amap.com/v3/place/text'
+const AMAP_INPUT_TIPS_URL = 'https://restapi.amap.com/v3/assistant/inputtips'
 
 const API_TIMEOUT = 5000
 const CACHE_TTL = 24 * 60 * 60 * 1000
@@ -122,7 +123,8 @@ export async function geocodeCandidates(address: string, city?: string): Promise
 
     if (results.length <= 1) {
       const placeResults = await searchPlaceCandidates(address, city)
-      merged = mergeCandidates(results, placeResults, city)
+      const tipResults = await searchInputTips(address, city)
+      merged = mergeCandidates(results, [...placeResults, ...tipResults], city)
     } else {
       merged = mergeCandidates(results, [], city)
     }
@@ -236,8 +238,59 @@ function mergeCandidates(
       // 再看区县
       if (a.district && city && a.district.includes(city)) scoreA += 1
       if (b.district && city && b.district.includes(city)) scoreB += 1
+      // 名称匹配
+      if (a.formatted_address.includes(city || '')) scoreA += 1
+      if (b.formatted_address.includes(city || '')) scoreB += 1
       return scoreB - scoreA
     })
+}
+
+async function searchInputTips(keyword: string, city?: string): Promise<GeocodingResult[]> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+  try {
+    const params = new URLSearchParams({
+      key: AMAP_KEY || '',
+      keywords: keyword,
+      datatype: 'all',
+      citylimit: 'false',
+    })
+
+    if (city) {
+      params.append('city', city)
+    }
+
+    const url = `${AMAP_INPUT_TIPS_URL}?${params.toString()}`
+    const response = await fetch(url, { signal: controller.signal })
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      return []
+    }
+
+    const data = (await response.json()) as AMapInputTipsResponse
+    if (data.status !== '1' || !Array.isArray(data.tips)) {
+      return []
+    }
+
+    return data.tips
+      .filter(tip => typeof tip.location === 'string' && tip.location.includes(','))
+      .map(tip => ({
+        formatted_address: tip.name || tip.district || keyword,
+        province: tip.district || undefined,
+        city: tip.district || undefined,
+        district: tip.district || undefined,
+        township: undefined,
+        adcode: tip.adcode,
+        location: {
+          lng: parseFloat(tip.location.split(',')[0]),
+          lat: parseFloat(tip.location.split(',')[1]),
+        },
+      }))
+  } catch (error: unknown) {
+    clearTimeout(timeoutId)
+    return []
+  }
 }
 
 type AMapResponse = {
@@ -274,6 +327,19 @@ type AMapPlacePoi = {
   cityname?: string
   adname?: string
   adcode?: string
+}
+
+type AMapInputTip = {
+  name?: string
+  district?: string
+  adcode?: string
+  location: string
+}
+
+type AMapInputTipsResponse = {
+  status: string
+  info: string
+  tips?: AMapInputTip[]
 }
 
 type GeocodingResult = {

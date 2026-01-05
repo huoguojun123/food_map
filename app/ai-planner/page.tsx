@@ -7,6 +7,15 @@ import { createPlan } from '@/lib/api/plans'
 import { generateAiPlan } from '@/lib/api/ai'
 import { geocodeAddress } from '@/lib/api/spots'
 
+/**
+ * AI 规划页面
+ * 特性：
+ * - 可输入自然语句（如“到开封书店街了”）自动提取地点并定位
+ * - 可手动输入位置、匹配候选、获取当前定位
+ * - 不勾选餐厅时默认使用“当前位置 + 半径”筛选出的餐厅并按距离排序
+ * - 勾选餐厅则仅使用勾选集合
+ * - 保存计划时写入 origin_text / origin_lat / origin_lng / radius_km
+ */
 export default function AiPlannerPage() {
   const [spots, setSpots] = useState<FoodSpot[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -18,6 +27,7 @@ export default function AiPlannerPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
   const [originText, setOriginText] = useState('')
   const [originCandidates, setOriginCandidates] = useState<
     Array<{ formatted_address: string; lat: number; lng: number; city?: string; district?: string }>
@@ -26,7 +36,7 @@ export default function AiPlannerPage() {
   const [isMatchingOrigin, setIsMatchingOrigin] = useState(false)
   const [radiusKm, setRadiusKm] = useState('6')
 
-  // Load spots
+  // 加载餐厅
   useEffect(() => {
     const load = async () => {
       try {
@@ -39,7 +49,7 @@ export default function AiPlannerPage() {
     load()
   }, [])
 
-  // Auto geocode when intent changes (if no origin yet)
+  // 自动尝试从需求/位置文本解析位置（如果还未定位）
   useEffect(() => {
     if (originLocation) return
     void autoGeocode({
@@ -51,6 +61,7 @@ export default function AiPlannerPage() {
       setOriginCandidates,
       setIsMatchingOrigin,
       setError,
+      reason: 'intent-change',
     })
   }, [intent]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -101,6 +112,7 @@ export default function AiPlannerPage() {
       setOriginCandidates,
       setIsMatchingOrigin,
       setError,
+      reason: 'auto-ensure',
     })
   }
 
@@ -110,7 +122,6 @@ export default function AiPlannerPage() {
       setError('暂无可规划的餐厅记录')
       return
     }
-
     if (autoSpots.length === 0) {
       setError('暂无可规划的餐厅记录')
       return
@@ -150,7 +161,6 @@ export default function AiPlannerPage() {
       setError('暂无可保存的餐厅记录')
       return
     }
-
     if (autoSpots.length === 0) {
       setError('暂无可保存的餐厅记录')
       return
@@ -200,6 +210,7 @@ export default function AiPlannerPage() {
       setOriginCandidates,
       setIsMatchingOrigin,
       setError,
+      reason: 'manual',
     })
   }
 
@@ -430,8 +441,17 @@ function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): 
 function extractLocationHint(intent: string, originText: string): string | null {
   const merged = (originText || intent || '').trim()
   if (!merged) return null
-  const match = merged.match(/到(.+?)了/)
-  if (match && match[1]) return match[1].trim()
+  const patterns = [
+    /到([^，。!.]+?)了/,
+    /在([^，。!.]+?)附近/,
+    /去([^，。!.]+?)玩/,
+    /到([^，。!.]+?)出差/,
+    /到([^，。!.]+?)旅游/,
+  ]
+  for (const p of patterns) {
+    const m = merged.match(p)
+    if (m && m[1]) return m[1].trim()
+  }
   return merged
 }
 
@@ -444,8 +464,18 @@ async function autoGeocode(opts: {
   setOriginCandidates: (value: any[]) => void
   setIsMatchingOrigin: (value: boolean) => void
   setError: (value: string | null) => void
+  reason?: string
 }): Promise<boolean> {
-  const { originText, intent, geocode, setOriginLocation, setOriginText, setOriginCandidates, setIsMatchingOrigin, setError } = opts
+  const {
+    originText,
+    intent,
+    geocode,
+    setOriginLocation,
+    setOriginText,
+    setOriginCandidates,
+    setIsMatchingOrigin,
+    setError,
+  } = opts
   const hint = extractLocationHint(intent, originText)
   if (!hint) return false
   setIsMatchingOrigin(true)
