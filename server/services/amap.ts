@@ -233,14 +233,14 @@ function mergeCandidates(
       let scoreA = 0
       let scoreB = 0
       // 优先匹配城市
-      if (a.city && city && a.city.includes(city)) scoreA += 2
-      if (b.city && city && b.city.includes(city)) scoreB += 2
+      if (a.city && city && a.city.includes(city)) scoreA += 3
+      if (b.city && city && b.city.includes(city)) scoreB += 3
       // 再看区县
-      if (a.district && city && a.district.includes(city)) scoreA += 1
-      if (b.district && city && b.district.includes(city)) scoreB += 1
+      if (a.district && city && a.district.includes(city)) scoreA += 2
+      if (b.district && city && b.district.includes(city)) scoreB += 2
       // 名称匹配
-      if (a.formatted_address.includes(city || '')) scoreA += 1
-      if (b.formatted_address.includes(city || '')) scoreB += 1
+      if (city && a.formatted_address.includes(city)) scoreA += 1
+      if (city && b.formatted_address.includes(city)) scoreB += 1
       return scoreB - scoreA
     })
 }
@@ -253,7 +253,7 @@ async function searchInputTips(keyword: string, city?: string): Promise<Geocodin
       key: AMAP_KEY || '',
       keywords: keyword,
       datatype: 'all',
-      citylimit: 'false',
+      citylimit: city ? 'true' : 'false',
     })
 
     if (city) {
