@@ -99,6 +99,22 @@ async function ensureColumns(): Promise<void> {
   if (!existing.has('taste')) {
     await d1Execute('ALTER TABLE food_spots ADD COLUMN taste TEXT')
   }
+
+  // trip_plans new columns
+  const tripRows = await d1Query<{ name: string }>('PRAGMA table_info(trip_plans)')
+  const tripExisting = new Set(tripRows.map(row => row.name))
+  if (!tripExisting.has('origin_text')) {
+    await d1Execute('ALTER TABLE trip_plans ADD COLUMN origin_text TEXT')
+  }
+  if (!tripExisting.has('origin_lat')) {
+    await d1Execute('ALTER TABLE trip_plans ADD COLUMN origin_lat REAL')
+  }
+  if (!tripExisting.has('origin_lng')) {
+    await d1Execute('ALTER TABLE trip_plans ADD COLUMN origin_lng REAL')
+  }
+  if (!tripExisting.has('radius_km')) {
+    await d1Execute('ALTER TABLE trip_plans ADD COLUMN radius_km REAL')
+  }
 }
 
 function splitSqlStatements(sql: string): string[] {

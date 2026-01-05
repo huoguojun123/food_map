@@ -50,7 +50,7 @@ async function readChatCompletionContentFromSse(res: Response): Promise<string> 
   }
 
   const reader = res.body.getReader()
-  const decoder = new TextDecoder()
+  const decoder = new TextDecoder('utf-8')
   let buffer = ''
   let content = ''
   let eventLines: string[] = []
@@ -140,6 +140,8 @@ async function readChatCompletionContentFromSse(res: Response): Promise<string> 
       }
     }
   }
+
+  buffer += decoder.decode()
 
   const tailData = eventLines.join('\n').trim()
   if (tailData) {
@@ -241,14 +243,16 @@ const IMAGE_SYSTEM_PROMPT = `
   "name": "餐厅名称",
   "address_text": "尽量完整的地址文本（缺失写空）",
   "taste": "口味/风格短语（如麻辣鲜香/清淡/炭烤/奶香），无法判断用“风格未知”",
-  "summary": "最多20字，必须包含口味/口感关键词"
+  "summary": "最多24字，包含口味关键词，补充1个细节（口感/环境/招牌）"
 }
 
 要求：
 - 优先识别店名与地址，避免遗漏
 - 若图片中出现明显口味/口感词（麻辣/香辣/清淡/咸鲜/甜辣/酸辣/浓郁/酥脆等），请提取为 taste
-- summary 必须 ≤20 字
+- 若未明确口味，也要根据菜系/店名推断口味风格
+- summary 必须 ≤24 字
 - summary 必须包含 taste（若 taste 为“风格未知”，summary 也要包含该词）
+ - summary 不要包含地址
 只返回 JSON，不要输出其它文字。
 `
 
@@ -258,29 +262,32 @@ const TEXT_SYSTEM_PROMPT = `
   "name": "餐厅名称",
   "address_text": "尽量完整的地址文本（缺失写空）",
   "taste": "口味/风格短语（如麻辣鲜香/清淡/炭烤/奶香），无法判断用“风格未知”",
-  "summary": "最多20字，必须包含口味/口感关键词"
+  "summary": "最多24字，包含口味关键词，补充1个细节（口感/环境/招牌）"
 }
 
 要求：
 - 优先识别店名与地址，避免遗漏
 - 若文本中明确给出“口味/风格/推荐/特色”等描述（如 麻辣鲜香/清淡/咸鲜/甜辣/酸辣/浓郁/酥脆），请优先提取为 taste
-- summary 必须 ≤20 字
+- 若未明确口味，也要根据菜系/店名推断口味风格
+- summary 必须 ≤24 字
 - summary 必须包含 taste（若 taste 为“风格未知”，summary 也要包含该词）
+ - summary 不要包含地址
 只返回 JSON，不要输出其它文字。
 `
 
 const SUMMARY_SYSTEM_PROMPT = `
-你是美食记录整理助手。根据提供的信息生成口味与简短描述。
+你是美食记录整理助手。必须基于店名/菜系/文本线索推断口味风格与简短点评。
 仅返回 JSON，格式：
 {
   "taste": "口味/风格，短语",
-  "summary": "最多20字的简短描述，必须包含口味关键词"
+  "summary": "最多24字的简短描述，必须包含口味关键词"
 }
 
 要求：
 - 如果提供了口味，就保持该口味，不要改写。
-- 如果无法判断口味，用“风格未知”。
-- summary 需要简洁有重点，20字以内。
+- 如果未给出口味，也需要基于店名/菜系推断口味风格（例如：火锅=麻辣鲜香、日料=清爽鲜甜、烧烤=炭烤香辣、甜品=甜香浓郁）。
+- 只有在完全无法判断时才使用“风格未知”。
+- summary 必须包含 taste，且有1个细节（口感/环境/招牌/性价比），不要包含地址。
 `
 
 export async function extractFromImage(base64Image: string): Promise<AiExtractionResult> {
@@ -431,7 +438,84 @@ export async function generateTasteSummary(input: {
   }
 }
 
-export default { extractFromImage, extractFromText, generateTasteSummary }
+export async function generatePlan(input: {
+  intent: string
+  spots: Array<{
+    id: number
+    name: string
+    address_text?: string
+    taste?: string
+    summary?: string
+    distance_km?: number
+  }>
+}): Promise<{ title: string; summary: string; order?: number[] }> {
+  if (OPENAI_MOCK) {
+    return {
+      title: 'Mock 旅途计划',
+      summary: 'Mock 计划说明',
+      order: input.spots.map(spot => spot.id),
+    }
+  }
+
+  if (!OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY environment variable is not set')
+  }
+
+  const spotLines = input.spots.map(spot =>
+    `#${spot.id} ${spot.name} | ${spot.taste || '口味未知'} | ${
+      spot.summary || '无描述'
+    }${typeof spot.distance_km === 'number' ? ` | 距离约${spot.distance_km.toFixed(1)}km` : ''}`
+  )
+
+  const prompt = `
+你是旅途规划助手，请根据用户需求与餐厅列表输出 JSON：
+{
+  "title": "计划标题（20字以内）",
+  "summary": "计划说明（60字以内）",
+  "order": [按推荐顺序的餐厅id数组]
+}
+
+要求：
+- 计划标题必须简洁清楚，突出需求场景。
+- 计划说明包含“口味/氛围/动线”至少两点，并优先考虑距离更近的餐厅。
+- order 必须是输入的餐厅 id 子集（可以全部）。
+
+用户需求：${input.intent || '未提供'}
+
+餐厅列表：
+${spotLines.join('\n')}
+`
+
+  const content = await retryWithBackoff(async () =>
+    requestChatCompletion({
+      messages: [
+        { role: 'system', content: '只返回 JSON，不要输出其它文字。' },
+        { role: 'user', content: prompt },
+      ],
+      max_tokens: 500,
+      model: OPENAI_TEXT_MODEL,
+    })
+  )
+
+  if (!content) {
+    throw new Error('No content returned from AI')
+  }
+
+  try {
+    const result = parseJsonFromAi<{ title?: unknown; summary?: unknown; order?: unknown }>(content)
+    const title = typeof result.title === 'string' ? result.title.trim() : '旅途规划'
+    const summary = typeof result.summary === 'string' ? result.summary.trim() : ''
+    const order = Array.isArray(result.order)
+      ? result.order.filter(value => Number.isFinite(Number(value))).map(value => Number(value))
+      : undefined
+    return { title, summary, order }
+  } catch (error) {
+    console.error('Failed to parse AI plan response:', content)
+    throw new Error('Failed to parse AI response as JSON')
+  }
+}
+
+export default { extractFromImage, extractFromText, generateTasteSummary, generatePlan }
 
 type AiExtractionResult = {
   name: string

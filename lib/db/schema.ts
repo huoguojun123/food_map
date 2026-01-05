@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS food_spots (
   taste TEXT,
 
   -- Content
-  summary TEXT, -- AI generated <20 chars
+  summary TEXT, -- AI generated <24 chars
   my_notes TEXT, -- Optional user manual notes
   tags TEXT, -- JSON Array: ["Hot", "Date Night"]
   rating REAL,
@@ -45,9 +45,23 @@ CREATE TABLE IF NOT EXISTS collections (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 4. Trip plans (AI planner outputs)
+CREATE TABLE IF NOT EXISTS trip_plans (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  summary TEXT,
+  spot_ids TEXT, -- JSON Array of spot IDs
+  origin_text TEXT,
+  origin_lat REAL,
+  origin_lng REAL,
+  radius_km REAL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_food_spots_location ON food_spots(lat, lng);
 CREATE INDEX IF NOT EXISTS idx_food_spots_created ON food_spots(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_trip_plans_created ON trip_plans(created_at DESC);
 `;
 
 export const insertSampleData = `

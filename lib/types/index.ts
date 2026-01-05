@@ -7,7 +7,7 @@ export interface FoodSpot {
   address_text?: string
   city?: string
   taste?: string
-  summary?: string // AI generated <20 chars
+  summary?: string // AI generated <24 chars
   my_notes?: string
   tags?: string // JSON Array string: ["Hot", "Date Night"]
   rating?: number
@@ -24,6 +24,18 @@ export interface Collection {
   title: string
   spot_ids: string // JSON Array string: "[1, 4, 12]"
   description?: string
+  created_at: string
+}
+
+export interface TripPlan {
+  id: number
+  title: string
+  summary?: string
+  spot_ids: string // JSON Array string: "[1, 4, 12]"
+  origin_text?: string
+  origin_lat?: number
+  origin_lng?: number
+  radius_km?: number
   created_at: string
 }
 
@@ -59,6 +71,16 @@ export interface CreateCollectionDto {
   description?: string
 }
 
+export interface CreateTripPlanDto {
+  title: string
+  summary?: string
+  spot_ids: number[]
+  origin_text?: string
+  origin_lat?: number
+  origin_lng?: number
+  radius_km?: number
+}
+
 // AI types
 export interface AiExtractionResult {
   name: string
@@ -68,7 +90,7 @@ export interface AiExtractionResult {
   dishes?: string[]
   vibe?: string
   taste?: string
-  summary: string // <20 chars
+  summary: string // <24 chars
 }
 
 export interface AiRecommendationRequest {

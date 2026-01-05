@@ -1,13 +1,22 @@
-﻿'use client'
+'use client'
 
+import React, { useEffect, useState } from 'react'
 import Omnibar from '@/components/layout/omnibar'
 import type { CreateSpotDto } from '@/lib/types/index'
 import { createSpot } from '@/lib/api/spots'
 
 export default function IngestPage() {
+  const [success, setSuccess] = useState(false)
+
   const handleSpotCreate = async (data: CreateSpotDto) => {
     await createSpot(data)
   }
+
+  useEffect(() => {
+    if (!success) return
+    const timer = setTimeout(() => setSuccess(false), 3000)
+    return () => clearTimeout(timer)
+  }, [success])
 
   return (
     <div className="min-h-screen page-shell">
@@ -26,15 +35,24 @@ export default function IngestPage() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-6">
         <div className="mag-card rounded-[32px] p-8">
           <p className="text-sm text-zinc-600">
             推荐直接粘贴分享文本并配合截图，链接仅作为补充信息。
           </p>
         </div>
+        {success && (
+          <div className="mag-card rounded-[24px] p-4 text-sm text-green-600">
+            已成功保存，继续录入下一家吧。
+          </div>
+        )}
       </main>
 
-      <Omnibar onSpotCreate={handleSpotCreate} collapsible={false} />
+      <Omnibar
+        onSpotCreate={handleSpotCreate}
+        collapsible={false}
+        onCreated={() => setSuccess(true)}
+      />
     </div>
   )
 }

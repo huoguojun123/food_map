@@ -3,11 +3,12 @@
 
 import { initializeDatabase } from './db/d1.js';
 import { handleCreateSpot, handleListSpots, handleGetSpot, handleUpdateSpot, handleDeleteSpot } from './api/spots.js';
-import { handleAiExtract } from './api/ai.js';
+import { handleAiExtract, handleAiPlan } from './api/ai.js';
 import { handleGeocode } from './api/geocode.js';
 import { handleImageProxy } from './api/images.js';
 import { handleUpload } from './api/upload.js';
 import { handleSettings, handleSettingsTest } from './api/settings.js';
+import { handleCreatePlan, handleDeletePlan, handleListPlans } from './api/plans.js';
 
 // Route handler type
 type RouteHandler = (req: Request, url: URL) => Response | Promise<Response>;
@@ -45,6 +46,13 @@ registerRoute('/api/ai/extract', async (req, url) => {
   return Response.json({ error: 'Method not allowed' }, { status: 405 });
 });
 
+registerRoute('/api/ai/plan', async (req, url) => {
+  if (req.method === 'POST') {
+    return handleAiPlan(req);
+  }
+  return Response.json({ error: 'Method not allowed' }, { status: 405 });
+});
+
 registerRoute('/api/ai/geocode', async (req, url) => {
   if (req.method === 'POST') {
     return handleGeocode(req);
@@ -76,6 +84,23 @@ registerRoute('/api/settings', async (req, url) => {
 registerRoute('/api/settings/test', async (req, url) => {
   if (req.method === 'POST') {
     return handleSettingsTest(req);
+  }
+  return Response.json({ error: 'Method not allowed' }, { status: 405 });
+});
+
+registerRoute('/api/plans', async (req, url) => {
+  if (req.method === 'POST') {
+    return handleCreatePlan(req);
+  }
+  if (req.method === 'GET') {
+    return handleListPlans();
+  }
+  return Response.json({ error: 'Method not allowed' }, { status: 405 });
+});
+
+registerRoute('/api/plans/', async (req, url) => {
+  if (req.method === 'DELETE') {
+    return handleDeletePlan(req, url);
   }
   return Response.json({ error: 'Method not allowed' }, { status: 405 });
 });

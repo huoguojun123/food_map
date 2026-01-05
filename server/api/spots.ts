@@ -86,10 +86,17 @@ export async function handleCreateSpot(req: Request, url: URL): Promise<Response
         ? { summary: existingSummary, taste: existingTaste }
         : await tryGenerateSummary(summaryInput);
     const summaryFallback = summaryInput.summary || summaryInput.taste || summaryInput.name;
-    const finalSummary =
-      normalizeSummary(aiResult.summary ?? summaryFallback) || summaryInput.name;
-    const finalTaste =
-      normalizeTaste(summaryInput.taste ?? aiResult.taste ?? '风格未知') || '风格未知';
+    const inferredTaste =
+      normalizeTaste(summaryInput.taste ?? aiResult.taste ?? inferTaste(summaryInput.name) ?? inferTasteFromText(summaryInput.original_share_text)) ||
+      '风格未知';
+    const summaryCandidate = normalizeSummary(aiResult.summary ?? summaryFallback) || '';
+    const finalTaste = inferredTaste;
+    const finalSummary = ensureSummaryQuality(
+      summaryCandidate,
+      finalTaste,
+      summaryInput.name,
+      summaryInput.original_share_text
+    );
 
     body.summary = finalSummary;
     body.taste = finalTaste;
@@ -283,10 +290,17 @@ export async function handleUpdateSpot(req: Request, url: URL): Promise<Response
 
     const aiResult = await tryGenerateSummary(summaryInput);
     const summaryFallback = summaryInput.summary || summaryInput.taste || summaryInput.name;
-    const finalSummary =
-      normalizeSummary(aiResult.summary ?? summaryFallback) || summaryInput.name;
-    const finalTaste =
-      normalizeTaste(summaryInput.taste ?? aiResult.taste ?? '风格未知') || '风格未知';
+    const inferredTaste =
+      normalizeTaste(summaryInput.taste ?? aiResult.taste ?? inferTaste(summaryInput.name) ?? inferTasteFromText(summaryInput.original_share_text)) ||
+      '风格未知';
+    const summaryCandidate = normalizeSummary(aiResult.summary ?? summaryFallback) || '';
+    const finalTaste = inferredTaste;
+    const finalSummary = ensureSummaryQuality(
+      summaryCandidate,
+      finalTaste,
+      summaryInput.name,
+      summaryInput.original_share_text
+    );
 
     payload.summary = finalSummary;
     payload.taste = finalTaste;
@@ -602,7 +616,7 @@ function normalizeSummary(value: string | undefined): string | null {
   if (!trimmed) {
     return null;
   }
-  return trimmed.length > 20 ? trimmed.slice(0, 20) : trimmed;
+  return trimmed.length > 24 ? trimmed.slice(0, 24) : trimmed;
 }
 
 function normalizeTaste(value: string | undefined): string | null {
@@ -614,6 +628,100 @@ function normalizeTaste(value: string | undefined): string | null {
     return null;
   }
   return trimmed.length > 32 ? trimmed.slice(0, 32) : trimmed;
+}
+
+function inferTaste(name: string): string | null {
+  const keywords: Array<{ match: RegExp; taste: string }> = [
+    { match: /(火锅|冒菜|串串|麻辣烫)/, taste: '麻辣鲜香（重辣）' },
+    { match: /(烧烤|烤串|烤肉|烤鱼)/, taste: '炭烤香辣' },
+    { match: /(牛排|西餐|意面|披萨)/, taste: '奶香浓郁' },
+    { match: /(日料|寿司|刺身|拉面)/, taste: '清爽鲜甜' },
+    { match: /(粤菜|早茶|点心|港式)/, taste: '清淡鲜香' },
+    { match: /(湘菜|川菜|麻辣|辣子)/, taste: '麻辣鲜香（重辣）' },
+    { match: /(甜品|烘焙|蛋糕|奶茶|糖水)/, taste: '甜香浓郁' },
+    { match: /(咖啡|咖啡馆)/, taste: '醇香微苦' },
+    { match: /(小龙虾|虾|蟹煲|海鲜)/, taste: '鲜香浓郁' },
+    { match: /(牛肉|羊肉|烤羊|炖)/, taste: '浓郁醇香' },
+    { match: /(面馆|米线|粉|饺子|包子)/, taste: '鲜香暖胃' },
+    { match: /(韩餐|韩式|部队锅|炸鸡)/, taste: '甜辣浓郁' },
+    { match: /(东南亚|泰式|越南|咖喱)/, taste: '酸辣香浓' },
+    { match: /(粤式烧腊|烧腊)/, taste: '咸香油润' },
+  ];
+
+  for (const rule of keywords) {
+    if (rule.match.test(name)) {
+      return rule.taste;
+    }
+  }
+  return null;
+}
+
+function inferTasteFromText(text?: string): string | null {
+  if (!text) return null;
+  const tasteHints: Array<{ match: RegExp; taste: string }> = [
+    { match: /(爆辣|重辣|特辣|超辣)/, taste: '麻辣鲜香（重辣）' },
+    { match: /(麻辣|香辣|辣子)/, taste: '麻辣鲜香（中辣）' },
+    { match: /(微辣|微麻)/, taste: '麻辣鲜香（微辣）' },
+    { match: /(清淡|清爽|微甜|不腻|低脂|少油)/, taste: '清爽清淡（不辣）' },
+    { match: /(咸鲜|鲜甜|鲜香|海味)/, taste: '咸鲜清爽' },
+    { match: /(酥脆|外脆内嫩|焦香)/, taste: '焦香酥脆' },
+    { match: /(浓郁|厚重|重口)/, taste: '浓郁醇香' },
+    { match: /(酸辣|酸爽)/, taste: '酸辣开胃（中辣）' },
+    { match: /(甜辣|蜜汁)/, taste: '甜辣浓郁' },
+    { match: /(奶香|芝士|黄油)/, taste: '奶香浓郁' },
+  ];
+  for (const hint of tasteHints) {
+    if (hint.match.test(text)) return hint.taste;
+  }
+  return null;
+}
+
+function inferDetailFromText(text?: string): string | null {
+  if (!text) return null;
+  const detailHints: Array<{ match: RegExp; detail: string }> = [
+    { match: /(必点|招牌|推荐)/, detail: '招牌值得点' },
+    { match: /(分量|超大份|量足)/, detail: '分量很足' },
+    { match: /(排队|人多|等位)/, detail: '人气很高' },
+    { match: /(性价比|划算|实惠)/, detail: '性价比高' },
+    { match: /(环境|装修|氛围)/, detail: '环境舒适' },
+    { match: /(服务|态度)/, detail: '服务在线' },
+    { match: /(油而不腻|不油腻|清爽)/, detail: '口感不腻' },
+    { match: /(回头客|常来|复购)/, detail: '回头率高' },
+  ];
+  for (const hint of detailHints) {
+    if (hint.match.test(text)) return hint.detail;
+  }
+  return null;
+}
+
+function buildFallbackSummary(taste: string, name: string, detail?: string | null): string {
+  const base = taste && taste !== '风格未知' ? taste : '风格未知';
+  const extra = detail ? `，${detail}` : '';
+  if (/火锅|冒菜|串串|麻辣烫/.test(name)) return `${base}，热乎解馋${detail ? '' : '，适合聚餐'}`.slice(0, 24);
+  if (/烧烤|烤串|烤肉|烤鱼/.test(name)) return `${base}，烤香上头${detail ? '' : '，烟火味足'}`.slice(0, 24);
+  if (/日料|寿司|刺身/.test(name)) return `${base}，食材新鲜${detail ? '' : '，清口'}`.slice(0, 24);
+  if (/甜品|烘焙|蛋糕|奶茶/.test(name)) return `${base}，甜度适中${detail ? '' : '，不腻'}`.slice(0, 24);
+  if (/咖啡/.test(name)) return `${base}，适合小坐${detail ? '' : '，慢品'}`.slice(0, 24);
+  if (/面馆|米线|粉/.test(name)) return `${base}，口感扎实${detail ? '' : '，暖胃'}`.slice(0, 24);
+  if (detail) return `${base}${extra}`.slice(0, 24);
+  return `${base}，值得一试`;
+}
+
+function ensureSummaryQuality(
+  summary: string,
+  taste: string,
+  name: string,
+  text?: string
+): string {
+  const weakPhrases = ['值得一试', '推荐尝试', '风格未知', '快来试试', '风格未知，', '推荐赏试'];
+  const hasTaste = taste && summary.includes(taste);
+  const tooShort = summary.length < 6;
+  const tooGeneric = weakPhrases.some(item => summary.includes(item));
+  if (summary && hasTaste && !tooShort && !tooGeneric) {
+    return summary;
+  }
+  const detail = inferDetailFromText(text);
+  return buildFallbackSummary(taste, name, detail);
 }
 
 async function tryGenerateSummary(input: SummaryInput): Promise<{

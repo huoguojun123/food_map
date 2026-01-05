@@ -10,9 +10,10 @@ import { ChevronUp, Send, X } from 'lucide-react'
 interface OmnibarProps {
   onSpotCreate: (spot: CreateSpotDto) => Promise<void>
   collapsible?: boolean
+  onCreated?: () => void
 }
 
-export default function Omnibar({ onSpotCreate, collapsible = true }: OmnibarProps) {
+export default function Omnibar({ onSpotCreate, collapsible = true, onCreated }: OmnibarProps) {
   const [descriptionText, setDescriptionText] = useState('')
   const [linkInput, setLinkInput] = useState('')
   const [linkUrl, setLinkUrl] = useState('')
@@ -234,6 +235,7 @@ export default function Omnibar({ onSpotCreate, collapsible = true }: OmnibarPro
         ),
       }
       await onSpotCreate(payload)
+      onCreated?.()
       resetOmnibar()
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败')

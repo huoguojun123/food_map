@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import type { CreateSpotDto } from '@/lib/types/index'
-import { geocodeAddress } from '@/lib/api/spots'
+import { geocodeAddress, uploadImageToR2 } from '@/lib/api/spots'
 import { Check, X } from 'lucide-react'
 
 interface SpotFormProps {
@@ -36,6 +36,17 @@ export default function SpotForm({
   const [isMatching, setIsMatching] = useState(false)
   const [matchError, setMatchError] = useState<string | null>(null)
   const [autoMatched, setAutoMatched] = useState(false)
+  const [existingImages, setExistingImages] = useState<string[]>([])
+  const [newImages, setNewImages] = useState<File[]>([])
+  const [newPreviews, setNewPreviews] = useState<string[]>([])
+  const [isUploadingImages, setIsUploadingImages] = useState(false)
+
+  useEffect(() => {
+    const initial = Array.isArray(initialData.screenshot_urls)
+      ? initialData.screenshot_urls.filter(url => typeof url === 'string' && url.trim().length > 0)
+      : []
+    setExistingImages(initial)
+  }, [initialData.screenshot_urls])
 
   const validateForm = (): boolean => {
     const nextErrors: Record<string, string> = {}
@@ -70,11 +81,27 @@ export default function SpotForm({
     setIsSaving(true)
 
     try {
-      await onSave(formData)
+      let uploadedUrls: string[] = []
+      if (newImages.length > 0) {
+        setIsUploadingImages(true)
+        for (const file of newImages) {
+          const result = await uploadImageToR2(file)
+          if (result.url) {
+            uploadedUrls.push(result.url)
+          }
+        }
+      }
+      const mergedImages = [...existingImages, ...uploadedUrls].filter(Boolean)
+      const payload: CreateSpotDto = {
+        ...formData,
+        screenshot_urls: mergedImages.length > 0 ? mergedImages : undefined,
+      }
+      await onSave(payload)
     } catch (err) {
       console.error('Save failed:', err)
       setErrors({ general: err instanceof Error ? err.message : '保存失败' })
     } finally {
+      setIsUploadingImages(false)
       setIsSaving(false)
     }
   }
@@ -148,6 +175,34 @@ export default function SpotForm({
     setMatchError(null)
     setAutoMatched(false)
   }, [formData.address_text])
+
+  const handleAddImages = async (files: File[]) => {
+    const validFiles = files.filter(file => file.type.startsWith('image/'))
+    if (validFiles.length === 0) {
+      return
+    }
+    const previews = await Promise.all(validFiles.map(file => readFileAsDataUrl(file)))
+    setNewImages(prev => [...prev, ...validFiles])
+    setNewPreviews(prev => [...prev, ...previews])
+  }
+
+  const removeExistingImage = (index: number) => {
+    setExistingImages(prev => prev.filter((_, idx) => idx !== index))
+  }
+
+  const removeNewImage = (index: number) => {
+    setNewImages(prev => prev.filter((_, idx) => idx !== index))
+    setNewPreviews(prev => prev.filter((_, idx) => idx !== index))
+  }
+
+  const resolveImageUrl = (value: string): string => {
+    if (!value) return value
+    if (value.startsWith('data:') || value.startsWith('http://') || value.startsWith('https://')) {
+      return value
+    }
+    const encoded = value.split('/').map(encodeURIComponent).join('/')
+    return `/api/images/${encoded}`
+  }
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -320,6 +375,66 @@ export default function SpotForm({
             <p className="mt-2 text-xs text-zinc-500">保存或修改后自动更新简短描述</p>
           </div>
 
+          {isEditing && (
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-2">
+                图片
+              </label>
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                {existingImages.map((url, index) => (
+                  <div key={`${url}-${index}`} className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={resolveImageUrl(url)}
+                      alt={`已保存图片 ${index + 1}`}
+                      className="h-20 w-full object-cover rounded-xl border border-orange-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeExistingImage(index)}
+                      className="absolute -top-2 -right-2 p-1.5 bg-white shadow-md rounded-full hover:bg-zinc-100 transition-colors"
+                      disabled={isSaving || isUploadingImages}
+                    >
+                      <X className="h-3.5 w-3.5 text-zinc-600" />
+                    </button>
+                  </div>
+                ))}
+                {newPreviews.map((url, index) => (
+                  <div key={`${url}-${index}`} className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt={`新增图片 ${index + 1}`}
+                      className="h-20 w-full object-cover rounded-xl border border-orange-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeNewImage(index)}
+                      className="absolute -top-2 -right-2 p-1.5 bg-white shadow-md rounded-full hover:bg-zinc-100 transition-colors"
+                      disabled={isSaving || isUploadingImages}
+                    >
+                      <X className="h-3.5 w-3.5 text-zinc-600" />
+                    </button>
+                  </div>
+                ))}
+                <label className="h-20 rounded-xl border border-dashed border-orange-200 text-xs text-zinc-400 flex items-center justify-center cursor-pointer hover:border-orange-300">
+                  添加
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={e => handleAddImages(Array.from(e.target.files || []))}
+                    className="hidden"
+                    disabled={isSaving || isUploadingImages}
+                  />
+                </label>
+              </div>
+              <p className="mt-2 text-xs text-zinc-500">
+                修改时可增删图片，保存后自动上传到云端。
+              </p>
+            </div>
+          )}
+
           {errors.general && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
               {errors.general}
@@ -337,11 +452,11 @@ export default function SpotForm({
             </button>
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || isUploadingImages}
               className="flex-1 px-6 py-3 rounded-xl bg-orange-500 text-white font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {isSaving ? '保存中...' : '保存'}
-              {isSaving && <Check className="h-5 w-5 animate-spin" />}
+              {isSaving || isUploadingImages ? '保存中...' : '保存'}
+              {(isSaving || isUploadingImages) && <Check className="h-5 w-5 animate-spin" />}
             </button>
           </div>
         </form>

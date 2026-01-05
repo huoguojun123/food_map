@@ -69,6 +69,7 @@ export default function HomePage() {
       address_text: spot.address_text,
       taste: spot.taste,
       summary: spot.summary,
+      screenshot_urls: extractStoredImages(spot),
     }
   }
 
@@ -142,6 +143,30 @@ export default function HomePage() {
     if (spot.screenshot_r2_key) {
       const resolved = buildR2Url(spot.screenshot_r2_key)
       if (resolved) urls.push(resolved)
+    }
+    return urls
+  }
+
+  const extractStoredImages = (spot: FoodSpot): string[] => {
+    const urls: string[] = []
+    if (spot.screenshot_urls) {
+      try {
+        const parsed = JSON.parse(spot.screenshot_urls)
+        if (Array.isArray(parsed)) {
+          parsed.forEach(url => {
+            if (typeof url === 'string' && url.trim()) {
+              urls.push(url.trim())
+            }
+          })
+        }
+      } catch {
+        if (typeof spot.screenshot_urls === 'string' && spot.screenshot_urls.trim()) {
+          urls.push(spot.screenshot_urls.trim())
+        }
+      }
+    }
+    if (spot.screenshot_r2_key) {
+      urls.push(spot.screenshot_r2_key)
     }
     return urls
   }
@@ -284,76 +309,49 @@ export default function HomePage() {
             </div>
 
             <div className="rounded-[28px] border border-orange-100 bg-white/80 shadow-sm overflow-hidden">
-              <div className="hidden lg:grid grid-cols-[0.7fr_1.1fr_2fr_0.9fr_0.9fr_1.1fr_2fr_auto] gap-4 px-5 py-3 text-xs font-semibold text-zinc-500 border-b border-orange-100">
-                <span>缩略图</span>
-                <span>店名</span>
-                <span>地址</span>
-                <span>纬度</span>
-                <span>经度</span>
-                <span>口味</span>
-                <span>简短描述</span>
-                <span className="text-right">操作</span>
-              </div>
               <div className="divide-y divide-orange-100">
                 {spots.map(spot => {
                   const images = getImageUrls(spot)
                   const thumb = images[0]
                   return (
-                    <div
-                      key={spot.id}
-                      className="grid gap-3 px-5 py-4 text-sm text-zinc-700 lg:grid-cols-[0.7fr_1.1fr_2fr_0.9fr_0.9fr_1.1fr_2fr_auto]"
-                    >
-                      <div className="flex items-center">
-                        <span className="text-xs text-zinc-400 lg:hidden">缩略图</span>
-                        <div className="mt-1 lg:mt-0">
-                          {thumb ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={thumb}
-                              alt={spot.name}
-                              className="h-14 w-20 object-cover rounded-lg border border-orange-100"
-                              onClick={() => setPreviewImage(thumb)}
-                              role="button"
-                              tabIndex={0}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  setPreviewImage(thumb)
-                                }
-                              }}
-                              style={{ cursor: 'zoom-in' }}
-                            />
-                          ) : (
-                            <div className="h-14 w-20 rounded-lg border border-dashed border-orange-200 text-[11px] text-zinc-400 flex items-center justify-center">
-                              无图
-                            </div>
-                          )}
+                    <div key={spot.id} className="px-5 py-5 space-y-4 text-sm text-zinc-700">
+                      <div className="flex items-start gap-4">
+                        {thumb ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={thumb}
+                            alt={spot.name}
+                            className="h-16 w-24 object-cover rounded-lg border border-orange-100"
+                            onClick={() => setPreviewImage(thumb)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                setPreviewImage(thumb)
+                              }
+                            }}
+                            style={{ cursor: 'zoom-in' }}
+                          />
+                        ) : (
+                          <div className="h-16 w-24 rounded-lg border border-dashed border-orange-200 text-[11px] text-zinc-400 flex items-center justify-center">
+                            无图
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <p className="font-semibold text-zinc-900 text-base">{spot.name}</p>
+                          <p className="text-xs text-zinc-500 mt-1">{formatText(spot.address_text)}</p>
                         </div>
                       </div>
-                      <div>
-                        <span className="text-xs text-zinc-400 lg:hidden">店名</span>
-                        <p className="font-semibold text-zinc-900 break-words">{spot.name}</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-zinc-600">
+                        <div>纬度：{formatCoord(spot.lat)}</div>
+                        <div>经度：{formatCoord(spot.lng)}</div>
+                        <div>地址：{formatText(spot.address_text)}</div>
                       </div>
-                      <div>
-                        <span className="text-xs text-zinc-400 lg:hidden">地址</span>
-                        <p className="break-words">{formatText(spot.address_text)}</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                        <div className="text-orange-700">口味：{formatText(spot.taste)}</div>
+                        <div className="text-zinc-700">描述：{formatText(spot.summary)}</div>
                       </div>
-                      <div>
-                        <span className="text-xs text-zinc-400 lg:hidden">纬度</span>
-                        <p className="font-mono text-sm text-zinc-600">{formatCoord(spot.lat)}</p>
-                      </div>
-                      <div>
-                        <span className="text-xs text-zinc-400 lg:hidden">经度</span>
-                        <p className="font-mono text-sm text-zinc-600">{formatCoord(spot.lng)}</p>
-                      </div>
-                      <div>
-                        <span className="text-xs text-zinc-400 lg:hidden">口味</span>
-                        <p className="text-orange-700">{formatText(spot.taste)}</p>
-                      </div>
-                      <div>
-                        <span className="text-xs text-zinc-400 lg:hidden">简短描述</span>
-                        <p className="text-zinc-700 break-words">{formatText(spot.summary)}</p>
-                      </div>
-                      <div className="flex items-center gap-2 lg:justify-end">
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => setEditingSpot(spot)}
