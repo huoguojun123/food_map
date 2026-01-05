@@ -627,6 +627,10 @@ function normalizeTaste(value: string | undefined): string | null {
   if (!trimmed) {
     return null;
   }
+  const unknownTaste = new Set(['风格未知', '口味未知', '未知', '暂无']);
+  if (unknownTaste.has(trimmed)) {
+    return null;
+  }
   return trimmed.length > 32 ? trimmed.slice(0, 32) : trimmed;
 }
 

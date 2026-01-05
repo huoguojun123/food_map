@@ -146,6 +146,7 @@ export default function AiPlannerPage() {
       setOriginCandidates([])
       setOriginLocation(coord)
       setOriginSource('manual')
+      setError(null)
       return
     }
 
@@ -167,6 +168,7 @@ export default function AiPlannerPage() {
     setOriginText(candidate.formatted_address)
     setOriginCandidates([])
     setOriginSource('manual')
+    setError(null)
   }
 
   // 浏览器定位：只在精度合理时作为“附近筛选”的 origin；否则自动降级到 IP 城市中心
@@ -189,6 +191,16 @@ export default function AiPlannerPage() {
           await handleIpLocate()
           setIsMatchingOrigin(false)
           return
+        }
+
+        if (ipHint?.center) {
+          const driftKm = getDistanceKm(latitude, longitude, ipHint.center.lat, ipHint.center.lng)
+          if (driftKm > 120) {
+            setError(`浏览器定位偏差约 ${Math.round(driftKm)}km，已切换到 IP 定位`)
+            await handleIpLocate()
+            setIsMatchingOrigin(false)
+            return
+          }
         }
 
         setOriginLocation({ lat: latitude, lng: longitude })
@@ -519,7 +531,7 @@ async function autoGeocode(opts: {
   query: string
   cityHint?: string
   reason: OriginSource
-  setOriginLocation: (loc: { lat: number; lng: number }) => void
+  setOriginLocation: (loc: { lat: number; lng: number } | null) => void
   setOriginText: (value: string) => void
   setOriginCandidates: (value: any[]) => void
   setOriginSource: (value: OriginSource) => void
@@ -560,12 +572,19 @@ async function autoGeocode(opts: {
     const candidates = result.candidates || []
     setOriginCandidates(candidates)
 
-    if (candidates.length > 0) {
+    if (candidates.length === 1) {
       const first = candidates[0]
       setOriginLocation({ lat: first.lat, lng: first.lng })
       setOriginText(first.formatted_address)
       setOriginSource(reason)
       return true
+    }
+    if (candidates.length > 1) {
+      setOriginLocation(null)
+      setOriginText(trimmed)
+      setOriginSource(null)
+      setError('已识别多个地址候选，请选择最准确的一项')
+      return false
     }
   } catch (err) {
     setError(err instanceof Error ? err.message : '位置匹配失败')

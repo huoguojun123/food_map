@@ -345,7 +345,6 @@ export default function HomePage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-zinc-600">
                         <div>纬度：{formatCoord(spot.lat)}</div>
                         <div>经度：{formatCoord(spot.lng)}</div>
-                        <div>地址：{formatText(spot.address_text)}</div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                         <div className="text-orange-700">口味：{formatText(spot.taste)}</div>
