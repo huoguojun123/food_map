@@ -5,7 +5,7 @@ import type { FoodSpot } from '@/lib/types/index'
 import { listSpots } from '@/lib/api/spots'
 import { createPlan } from '@/lib/api/plans'
 import { generateAiPlan } from '@/lib/api/ai'
-import { geocodeAddress } from '@/lib/api/spots'
+import { geocodeAddress, reverseGeocode } from '@/lib/api/spots'
 
 /**
  * AI 规划页面
@@ -49,11 +49,13 @@ export default function AiPlannerPage() {
     load()
   }, [])
 
-  // 自动尝试从需求/位置文本解析位置（如果还未定位）
+  // 自动尝试从需求中提取地点并定位（如果还未定位、且用户未手动输入位置）
   useEffect(() => {
     if (originLocation) return
+    if (originText.trim().length > 0) return
+
     void autoGeocode({
-      originText,
+      originText: '',
       intent,
       geocode: geocodeAddress,
       setOriginLocation,
@@ -227,11 +229,19 @@ export default function AiPlannerPage() {
     }
     setIsMatchingOrigin(true)
     navigator.geolocation.getCurrentPosition(
-      pos => {
-        setIsMatchingOrigin(false)
+      async pos => {
         const { latitude, longitude } = pos.coords
         setOriginLocation({ lat: latitude, lng: longitude })
-        setOriginText(`当前定位 (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`)
+        setOriginCandidates([])
+
+        try {
+          const info = await reverseGeocode(latitude, longitude)
+          setOriginText(info.formatted_address || '')
+        } catch {
+          setOriginText('')
+        } finally {
+          setIsMatchingOrigin(false)
+        }
       },
       err => {
         setIsMatchingOrigin(false)
@@ -441,6 +451,10 @@ function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): 
 function extractLocationHint(intent: string, originText: string): string | null {
   const merged = (originText || intent || '').trim()
   if (!merged) return null
+  // 过滤明显的“坐标字符串/当前定位”输入，避免当作关键词去高德匹配
+  if (isLikelyCoordinateText(merged)) {
+    return null
+  }
   const patterns = [
     /到([^，。!.]+?)了/,
     /在([^，。!.]+?)附近/,
@@ -453,6 +467,15 @@ function extractLocationHint(intent: string, originText: string): string | null 
     if (m && m[1]) return m[1].trim()
   }
   return merged
+}
+
+function isLikelyCoordinateText(value: string): boolean {
+  const trimmed = value.trim()
+  if (!trimmed) return false
+  if (trimmed.startsWith('当前定位') || trimmed.startsWith('已定位')) {
+    return true
+  }
+  return Boolean(trimmed.match(/-?\d{1,3}\.\d+,\s*-?\d{1,3}\.\d+/))
 }
 
 async function autoGeocode(opts: {
@@ -476,6 +499,15 @@ async function autoGeocode(opts: {
     setIsMatchingOrigin,
     setError,
   } = opts
+  // 如果输入里已经包含可解析的坐标，直接用坐标，不走高德匹配，避免“当前/坐标”导致跨省
+  const coordinate = parseCoordinates(originText) ?? parseCoordinates(intent)
+  if (coordinate) {
+    setOriginLocation({ lat: coordinate.lat, lng: coordinate.lng })
+    setOriginCandidates([])
+    setOriginText('')
+    return true
+  }
+
   const hint = extractLocationHint(intent, originText)
   if (!hint) return false
   setIsMatchingOrigin(true)
@@ -497,4 +529,23 @@ async function autoGeocode(opts: {
     setIsMatchingOrigin(false)
   }
   return false
+}
+
+function parseCoordinates(value: string): { lat: number; lng: number } | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  const match = trimmed.match(/(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/)
+  if (!match) return null
+  const a = Number(match[1])
+  const b = Number(match[2])
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null
+
+  // 常见写法：lat,lng 或 lng,lat 都可能；根据范围做判断
+  const looksLikeLatLng = Math.abs(a) <= 90 && Math.abs(b) <= 180
+  const looksLikeLngLat = Math.abs(a) <= 180 && Math.abs(b) <= 90
+  if (looksLikeLatLng && !looksLikeLngLat) return { lat: a, lng: b }
+  if (looksLikeLngLat && !looksLikeLatLng) return { lat: b, lng: a }
+  // 两种都可能时默认按 lat,lng
+  return { lat: a, lng: b }
 }

@@ -5,6 +5,7 @@ const AMAP_KEY = process.env.AMAP_KEY
 const AMAP_GEOCODE_URL = 'https://restapi.amap.com/v3/geocode/geo'
 const AMAP_PLACE_URL = 'https://restapi.amap.com/v3/place/text'
 const AMAP_INPUT_TIPS_URL = 'https://restapi.amap.com/v3/assistant/inputtips'
+const AMAP_REVERSE_GEOCODE_URL = 'https://restapi.amap.com/v3/geocode/regeo'
 
 const API_TIMEOUT = 5000
 const CACHE_TTL = 24 * 60 * 60 * 1000
@@ -146,7 +147,63 @@ export async function geocodeCandidates(address: string, city?: string): Promise
   }
 }
 
-export default { geocode, geocodeCandidates }
+export async function reverseGeocode(
+  lat: number,
+  lng: number
+): Promise<{
+  formatted_address: string
+  province?: string
+  city?: string
+  district?: string
+  adcode?: string
+}> {
+  if (!AMAP_KEY) {
+    throw new Error('AMAP_KEY environment variable is not set')
+  }
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+
+  try {
+    const params = new URLSearchParams({
+      key: AMAP_KEY,
+      location: `${lng},${lat}`,
+      radius: '1000',
+      extensions: 'base',
+      roadlevel: '0',
+    })
+
+    const url = `${AMAP_REVERSE_GEOCODE_URL}?${params.toString()}`
+    const response = await fetch(url, { signal: controller.signal })
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      throw new Error(`AMap API error: ${response.status}`)
+    }
+
+    const data = (await response.json()) as AMapReverseResponse
+    if (data.status !== '1' || !data.regeocode) {
+      throw new Error(`AMap reverse geocoding failed: ${data.info}`)
+    }
+
+    const component = data.regeocode.addressComponent
+    return {
+      formatted_address: data.regeocode.formatted_address || '未知位置',
+      province: component?.province,
+      city: component?.city,
+      district: component?.district,
+      adcode: component?.adcode,
+    }
+  } catch (error: unknown) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Reverse geocoding request timeout')
+    }
+    throw error
+  }
+}
+
+export default { geocode, geocodeCandidates, reverseGeocode }
 
 async function searchPlaceCandidates(query: string, city?: string): Promise<GeocodingResult[]> {
   const controller = new AbortController()
@@ -340,6 +397,20 @@ type AMapInputTipsResponse = {
   status: string
   info: string
   tips?: AMapInputTip[]
+}
+
+type AMapReverseResponse = {
+  status: string
+  info: string
+  regeocode?: {
+    formatted_address?: string
+    addressComponent?: {
+      province?: string
+      city?: string
+      district?: string
+      adcode?: string
+    }
+  }
 }
 
 type GeocodingResult = {

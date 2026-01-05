@@ -105,6 +105,35 @@ export async function geocodeAddress(
   };
 }
 
+export async function reverseGeocode(
+  lat: number,
+  lng: number
+): Promise<{
+  formatted_address: string
+  province?: string
+  city?: string
+  district?: string
+  adcode?: string
+}> {
+  const response = await apiClient.post<{
+    success: boolean
+    data?: {
+      formatted_address: string
+      province?: string
+      city?: string
+      district?: string
+      adcode?: string
+    }
+    error?: string
+  }>('/api/ai/regeo', { lat, lng })
+
+  if (!response.success || !response.data) {
+    throw new Error(response.error || 'Reverse geocoding failed')
+  }
+
+  return response.data
+}
+
 /**
  * Upload image to R2
  */
