@@ -123,6 +123,16 @@ export default function TripsPage() {
                   {planSpots.length === 0 && (
                     <div className="text-sm text-zinc-500">计划内暂无餐厅记录。</div>
                   )}
+                  {plan.origin_lat && plan.origin_lng && planSpots.length > 0 && (
+                    <a
+                      className="text-xs text-orange-600 hover:underline"
+                      target="_blank"
+                      rel="noreferrer"
+                      href={buildAmapMarker(plan.origin_lng, plan.origin_lat, plan.title, planSpots[0].lng, planSpots[0].lat)}
+                    >
+                      打开高德：起点与首个餐厅
+                    </a>
+                  )}
                 </div>
               </div>
             )
@@ -131,4 +141,21 @@ export default function TripsPage() {
       </main>
     </div>
   )
+}
+
+function buildAmapMarker(
+  originLng: number,
+  originLat: number,
+  title: string,
+  firstLng?: number,
+  firstLat?: number
+): string {
+  const origin = `${originLng},${originLat}`
+  if (firstLng !== undefined && firstLat !== undefined) {
+    const dest = `${firstLng},${firstLat}`
+    return `https://uri.amap.com/navigation?from=${origin},${encodeURIComponent(
+      title
+    )}&to=${dest},首个餐厅&mode=car&callnative=0`
+  }
+  return `https://uri.amap.com/marker?position=${origin}&name=${encodeURIComponent(title)}`
 }

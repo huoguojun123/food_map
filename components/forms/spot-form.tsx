@@ -40,6 +40,7 @@ export default function SpotForm({
   const [newImages, setNewImages] = useState<File[]>([])
   const [newPreviews, setNewPreviews] = useState<string[]>([])
   const [isUploadingImages, setIsUploadingImages] = useState(false)
+  const [previewModal, setPreviewModal] = useState<string | null>(null)
 
   useEffect(() => {
     const initial = Array.isArray(initialData.screenshot_urls)
@@ -387,7 +388,8 @@ export default function SpotForm({
                     <img
                       src={resolveImageUrl(url)}
                       alt={`已保存图片 ${index + 1}`}
-                      className="h-20 w-full object-cover rounded-xl border border-orange-100"
+                      className="h-20 w-full object-cover rounded-xl border border-orange-100 cursor-zoom-in"
+                      onClick={() => setPreviewModal(resolveImageUrl(url))}
                     />
                     <button
                       type="button"
@@ -405,7 +407,8 @@ export default function SpotForm({
                     <img
                       src={url}
                       alt={`新增图片 ${index + 1}`}
-                      className="h-20 w-full object-cover rounded-xl border border-orange-100"
+                      className="h-20 w-full object-cover rounded-xl border border-orange-100 cursor-zoom-in"
+                      onClick={() => setPreviewModal(url)}
                     />
                     <button
                       type="button"
@@ -461,6 +464,32 @@ export default function SpotForm({
           </div>
         </form>
       </div>
+
+      {previewModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setPreviewModal(null)}
+        >
+          <div
+            className="max-w-5xl max-h-[90vh] bg-white rounded-2xl overflow-hidden shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewModal}
+              alt="预览大图"
+              className="object-contain w-full h-full max-h-[90vh] bg-black"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setPreviewModal(null)}
+            className="absolute top-4 right-4 text-white text-lg px-3 py-2 rounded-full bg-black/40 hover:bg-black/60"
+          >
+            关闭
+          </button>
+        </div>
+      )}
     </div>
   )
 }
